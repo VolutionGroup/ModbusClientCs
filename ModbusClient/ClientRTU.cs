@@ -96,12 +96,12 @@ namespace VVG.Modbus
             _comms = port;
         }
 
-        bool ReadCoil(byte addr, UInt16 coilNo)
+        public bool ReadCoil(byte addr, UInt16 coilNo)
         {
             return ReadCoils(addr, coilNo, 1)[0];
         }
-        
-        bool[] ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
+
+        public bool[] ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
         {
             byte[] rxBuf = new byte[32];
             UInt16 maxCoilRead = (UInt16)((rxBuf.Length - READ_COILS_RX_OVERHEAD) * 8);
@@ -173,7 +173,7 @@ namespace VVG.Modbus
             }
         }
 
-        bool ReadDiscreteInput(byte addr, UInt16 inputNo)
+        public bool ReadDiscreteInput(byte addr, UInt16 inputNo)
         {
             return ReadDiscreteInputs(addr, inputNo, 1)[0];
         }
@@ -181,7 +181,7 @@ namespace VVG.Modbus
         /**
          *	Command 2 - Read Discrete Inputs
          */
-        bool[] ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
+        public bool[] ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
         {
             byte[] rxBuf = new byte[32];
             int maxCoilRead = (rxBuf.Length - READ_DI_RX_OVERHEAD) * 8;
@@ -254,7 +254,7 @@ namespace VVG.Modbus
             }
         }
 
-        UInt16 ReadHoldingReg(byte addr, UInt16 regNo)
+        public UInt16 ReadHoldingReg(byte addr, UInt16 regNo)
         {
             return ReadHoldingRegs(addr, regNo, 1)[0];
         }
@@ -262,7 +262,7 @@ namespace VVG.Modbus
         /**
          *	Command 3 - Read Holding Registers
          */
-        UInt16[] ReadHoldingRegs(byte addr, UInt16 regStartNo, UInt16 len)
+        public UInt16[] ReadHoldingRegs(byte addr, UInt16 regStartNo, UInt16 len)
         {
             byte[] rxBuf = new byte[64];
             int maxRegsRead = (rxBuf.Length - READ_HR_RX_OVERHEAD) / 2;
@@ -319,7 +319,7 @@ namespace VVG.Modbus
             }
         }
 
-        UInt16 ReadInputReg(byte addr, UInt16 regNo)
+        public UInt16 ReadInputReg(byte addr, UInt16 regNo)
         {
             return ReadInputRegs(addr, regNo, 1)[0];
         }
@@ -327,7 +327,7 @@ namespace VVG.Modbus
         /**
          *	Command 4 - Read Input Registers
          */
-        UInt16[] ReadInputRegs(byte addr, UInt16 regStartNo, UInt16 len)
+        public UInt16[] ReadInputRegs(byte addr, UInt16 regStartNo, UInt16 len)
         {
             byte[] rxBuf = new byte[64];
             int maxRegsRead = (rxBuf.Length - READ_IR_RX_OVERHEAD) / 2;
@@ -387,7 +387,7 @@ namespace VVG.Modbus
         /**
          *	Command 5 - Write Single Coil
          */
-        void WriteCoil(byte addr, UInt16 coilNo, bool txCoil)
+        public void WriteCoil(byte addr, UInt16 coilNo, bool txCoil)
         {
             if (coilNo > MAX_REG_NO)
             {
@@ -436,7 +436,7 @@ namespace VVG.Modbus
         /**
          *	Command 6 - Write Single Holding Register
          */
-        void WriteHoldingReg(byte addr, UInt16 regNo, UInt16 txReg)
+        public void WriteHoldingReg(byte addr, UInt16 regNo, UInt16 txReg)
         {
             if (regNo > MAX_REG_NO)
             {
@@ -485,13 +485,13 @@ namespace VVG.Modbus
         /**
          *	Command 15 - Write Coils (multiple)
          */
-        void WriteCoils(byte addr, UInt16 coilStartNo, UInt16 len, bool[] txCoils)
+        public void WriteCoils(byte addr, UInt16 coilStartNo, bool[] txCoils)
         {
             byte[] txData = new byte[32];
             int maxCoilWrite = (txData.Length - WRITE_COILS_TX_OVERHEAD) * 8;
 	
-	        if (	((coilStartNo + len) > MAX_REG_NO)
-		        ||	(len > maxCoilWrite) )
+	        if (	((coilStartNo + txCoils.Length) > MAX_REG_NO)
+		        ||	(txCoils.Length > maxCoilWrite) )
 	        {
                 throw new ArgumentException();
 	        }
@@ -505,15 +505,15 @@ namespace VVG.Modbus
                 txData[1] = (byte)ModbusCommands.MBCMD_WRITE_COIL_MULTIPLE;
                 txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
                 txData[3] = (byte)(coilStartNo & 0x00FF);
-                txData[4] = (byte)((len & 0xFF00) >> 8);
-                txData[5] = (byte)(len & 0x00FF);
+                txData[4] = (byte)((txCoils.Length & 0xFF00) >> 8);
+                txData[5] = (byte)(txCoils.Length & 0x00FF);
                 // txData[6] to be filled with number of bytes after filling the buffer
 
                 // Populate the txCoils on to the transmit buffer
                 byte txLen = 7;
                 txData[txLen] = 0;
                 byte bitPos = 0;
-                for (UInt16 i = 0; i < len; i++)
+                for (UInt16 i = 0; i < txCoils.Length; i++)
                 {
                     txData[txLen] <<= 1;
                     if (txCoils[i])
@@ -571,7 +571,7 @@ namespace VVG.Modbus
         /**
          *	Command 16 - Write Holding Registers (multiple)
          */
-        void WriteHoldingRegs(byte addr, UInt16 regStartNo, UInt16[] txRegs)
+        public void WriteHoldingRegs(byte addr, UInt16 regStartNo, UInt16[] txRegs)
         {
             // TODO make this dynamic
             byte[] txData = new byte[64];
@@ -646,7 +646,7 @@ namespace VVG.Modbus
          *	@param[in]	len		Length (in bytes) to read
          *	@param[out]	txFileRecs	Records read from file
          */
-        byte[] ReadFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, UInt16 len)
+        public byte[] ReadFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, UInt16 len)
         {
             byte[] txData = new byte[READ_FILE_RECORD_TX_LEN];
             byte[] rxData = new byte[READ_FILE_RECORD_RX_OVERHEAD + len];
@@ -710,7 +710,7 @@ namespace VVG.Modbus
          *	@param[in]	len		Length (in bytes) to write
          *	@param[in]	txFileRecs	Records to write to file
          */
-        void WriteFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, byte[] txFileRecs)
+        public void WriteFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, byte[] txFileRecs)
         {
             if ((txFileRecs.Length == 0) || (txFileRecs.Length > (255 - WRITE_FILE_RECORD_TX_OVERHEAD)))
             {

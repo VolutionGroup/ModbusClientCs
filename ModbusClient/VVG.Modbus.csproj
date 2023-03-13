@@ -41,6 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ClientRTU.cs" />
+    <Compile Include="ClientSlave.cs" />
     <Compile Include="ModbusException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
