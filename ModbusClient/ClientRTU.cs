@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO.Ports;
+using System.Threading;
+using System.Diagnostics;
 
 namespace VVG.Modbus
 {
@@ -89,183 +91,216 @@ namespace VVG.Modbus
             MBEX_GATEWAY_TARGET_DEV_FAILED_TO_RESPOND
         }
 
-        readonly SerialPort _comms;
+        const int TIMEOUT = 500;
 
+        readonly SerialPort _comms;
+        
         public ClientRTU(SerialPort port)
         {
             _comms = port;
+            _comms.DataReceived += _comms_DataReceived;
         }
 
-        public bool ReadCoil(byte addr, UInt16 coilNo)
+        private List<byte> _rxData = new List<byte>();
+        private AutoResetEvent _dataRx = new AutoResetEvent(false);
+
+        private void _comms_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
-            return ReadCoils(addr, coilNo, 1)[0];
+            if (e.EventType == SerialData.Chars)
+            {
+                var rx = new byte[_comms.BytesToRead];
+                _comms.Read(rx, 0, rx.Length);
+                _rxData.AddRange(rx);
+                _dataRx.Set();
+            }
         }
 
-        public bool[] ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
+        private async Task<byte[]> CommsReceive(int count)
         {
-            byte[] rxBuf = new byte[32];
-            UInt16 maxCoilRead = (UInt16)((rxBuf.Length - READ_COILS_RX_OVERHEAD) * 8);
+            var sw = new Stopwatch();
+            sw.Restart();
+            _dataRx.Reset();
+            while ((sw.ElapsedMilliseconds < TIMEOUT) && (_rxData.Count < count))
+            {
+                var msRemaining = (int)(TIMEOUT - sw.ElapsedMilliseconds);
+                await Task.Run(() => _dataRx.WaitOne(msRemaining));
+            }
+
+            var data = _rxData.ToArray();
+            _rxData.Clear();
+            return data;
+        }
+
+        private void CommsPurge()
+        {
+            _comms.ReadExisting();
+            _rxData.Clear();
+        }
+
+        public async Task<bool> ReadCoil(byte addr, UInt16 coilNo)
+        {
+            var coils = await ReadCoils(addr, coilNo, 1);
+            return coils[0];
+        }
+
+        public async Task<bool[]> ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
+        {
+            UInt16 maxCoilRead = (UInt16)((32 - READ_COILS_RX_OVERHEAD) * 8);
 
             if (((coilStartNo + len) > MAX_REG_NO) || (len > maxCoilRead))
             {
                 throw new ArgumentException();
             }
 
-            lock (_comms)
+            CommsPurge();
+
+            byte[] txData = new byte[READ_COILS_TX_LEN];
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_READ_COILS;
+            txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
+            txData[3] = (byte)(coilStartNo & 0x00FF);
+            txData[4] = (byte)((len & 0xFF00) >> 8);
+            txData[5] = (byte)(len & 0x00FF);
+
+            UInt16 crc = Crc16(txData, 6);
+            txData[6] = (byte)(crc & 0x00FF);
+            txData[7] = (byte)((crc & 0xFF00) >> 8);
+            _comms.Write(txData, 0, txData.Length);
+
+            int expectedDataCount = (len / 8);
+            if ((len % 8) > 0)
             {
-                _comms.ReadExisting();
-
-                byte[] txData = new byte[READ_COILS_TX_LEN];
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_READ_COILS;
-                txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
-                txData[3] = (byte)(coilStartNo & 0x00FF);
-                txData[4] = (byte)((len & 0xFF00) >> 8);
-                txData[5] = (byte)(len & 0x00FF);
-
-                UInt16 crc = Crc16(txData, 6);
-                txData[6] = (byte)(crc & 0x00FF);
-                txData[7] = (byte)((crc & 0xFF00) >> 8);
-                _comms.Write(txData, 0, txData.Length);
-
-                int expectedDataCount = (len / 8);
-                if ((len % 8) > 0)
-                {
-                    expectedDataCount++;
-                }
-                int expectedLen = READ_COILS_RX_OVERHEAD + expectedDataCount;
-
-                int rcvLen = _comms.Read(rxBuf, 0, expectedLen);
-
-                // Check the length and header
-                if ((rcvLen != expectedLen)
-                    || (rxBuf[0] != addr)
-                    || (rxBuf[1] != (byte)ModbusCommands.MBCMD_READ_COILS)
-                    || (rxBuf[2] != expectedDataCount))
-                {
-                    throw new ModbusException(rxBuf, rcvLen);
-                }
-
-                // Check the CRC
-                crc = Crc16(rxBuf, expectedDataCount + 3);
-                if (((crc & 0x00FF) != rxBuf[rxBuf[2] + 3])
-                    || (((crc & 0xFF00) >> 8) != rxBuf[rxBuf[2] + 4]))
-                {
-                    throw new ModbusException("CRC failure");
-                }
-
-                // Populate the return buffer
-                byte bufferIdx = 3;
-                byte bitPos = 0;
-                bool[] rxCoils = new bool[len];
-                for (UInt16 i = 0; i < len; i++)
-                {
-                    byte bitMask = (byte)(1 << bitPos);
-                    rxCoils[i] = (rxBuf[bufferIdx] & bitMask) != 0;
-                    if (++bitPos >= 8)
-                    {
-                        bitPos = 0;
-                        bufferIdx++;
-                    }
-                }
-
-                return rxCoils;
+                expectedDataCount++;
             }
+            int expectedLen = READ_COILS_RX_OVERHEAD + expectedDataCount;
+
+            var rxData = await CommsReceive(expectedLen);
+
+            // Check the length and header
+            if ((rxData.Length != expectedLen)
+                || (rxData[0] != addr)
+                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_COILS)
+                || (rxData[2] != expectedDataCount))
+            {
+                throw new ModbusException(rxData);
+            }
+
+            // Check the CRC
+            crc = Crc16(rxData, expectedDataCount + 3);
+            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
+                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
+            {
+                throw new ModbusException("CRC failure");
+            }
+
+            // Populate the return buffer
+            byte bufferIdx = 3;
+            byte bitPos = 0;
+            bool[] rxCoils = new bool[len];
+            for (UInt16 i = 0; i < len; i++)
+            {
+                byte bitMask = (byte)(1 << bitPos);
+                rxCoils[i] = (rxData[bufferIdx] & bitMask) != 0;
+                if (++bitPos >= 8)
+                {
+                    bitPos = 0;
+                    bufferIdx++;
+                }
+            }
+
+            return rxCoils;
         }
 
-        public bool ReadDiscreteInput(byte addr, UInt16 inputNo)
+        public async Task<bool> ReadDiscreteInput(byte addr, UInt16 inputNo)
         {
-            return ReadDiscreteInputs(addr, inputNo, 1)[0];
+            var di = await ReadDiscreteInputs(addr, inputNo, 1);
+            return di[0];
         }
 
         /**
          *	Command 2 - Read Discrete Inputs
          */
-        public bool[] ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
+        public async Task<bool[]> ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
         {
-            byte[] rxBuf = new byte[32];
-            int maxCoilRead = (rxBuf.Length - READ_DI_RX_OVERHEAD) * 8;
+            int maxCoilRead = (32 - READ_DI_RX_OVERHEAD) * 8;
 
             if (((inputStartNo + len) > MAX_REG_NO)
                 || (len > maxCoilRead))
             {
                 throw new ArgumentException();
             }
+            
+            CommsPurge();
 
-            lock (_comms)
+            byte[] txData = new byte[READ_DI_TX_LEN];
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_READ_DI;
+            txData[2] = (byte)((inputStartNo & 0xFF00) >> 8);
+            txData[3] = (byte)(inputStartNo & 0x00FF);
+            txData[4] = (byte)((len & 0xFF00) >> 8);
+            txData[5] = (byte)(len & 0x00FF);
+
+            UInt16 crc = Crc16(txData, 6);
+            txData[6] = (byte)(crc & 0x00FF);
+            txData[7] = (byte)((crc & 0xFF00) >> 8);
+            _comms.Write(txData, 0, READ_DI_TX_LEN);
+
+            int expectedDataCount = (len / 8);
+            if ((len % 8) > 0)
             {
-                _comms.ReadExisting();
-
-                byte[] txData = new byte[READ_DI_TX_LEN];
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_READ_DI;
-                txData[2] = (byte)((inputStartNo & 0xFF00) >> 8);
-                txData[3] = (byte)(inputStartNo & 0x00FF);
-                txData[4] = (byte)((len & 0xFF00) >> 8);
-                txData[5] = (byte)(len & 0x00FF);
-
-                UInt16 crc = Crc16(txData, 6);
-                txData[6] = (byte)(crc & 0x00FF);
-                txData[7] = (byte)((crc & 0xFF00) >> 8);
-                _comms.Write(txData, 0, READ_DI_TX_LEN);
-
-                int expectedDataCount = (len / 8);
-                if ((len % 8) > 0)
-                {
-                    expectedDataCount++;
-                }
-                int expectedLen = READ_DI_RX_OVERHEAD + expectedDataCount;
-
-                int rcvLen = _comms.Read(rxBuf, 0, expectedLen);
-
-                // Check the length and header
-                if ((rcvLen != expectedLen)
-                    || (rxBuf[0] != addr)
-                    || (rxBuf[1] != (byte)ModbusCommands.MBCMD_READ_DI)
-                    || (rxBuf[2] != expectedDataCount))
-                {
-                    throw new ModbusException(rxBuf, rcvLen);
-                }
-
-                // Check the CRC
-                crc = Crc16(rxBuf, expectedDataCount + 3);
-                if (((crc & 0x00FF) != rxBuf[rxBuf[2] + 3])
-                    || (((crc & 0xFF00) >> 8) != rxBuf[rxBuf[2] + 4]))
-                {
-                    throw new ModbusException("CRC failure");
-                }
-
-                // Populate the return buffer
-                byte bufferIdx = 3;
-                byte bitPos = 0;
-                bool[] rxInputs = new bool[len];
-                for (UInt16 i = 0; i < len; i++)
-                {
-                    byte bitMask = (byte)(1 << bitPos);
-                    rxInputs[i] = (rxBuf[bufferIdx] & bitMask) != 0;
-                    if (++bitPos >= 8)
-                    {
-                        bitPos = 0;
-                        bufferIdx++;
-                    }
-                }
-
-                return rxInputs;
+                expectedDataCount++;
             }
+            int expectedLen = READ_DI_RX_OVERHEAD + expectedDataCount;
+
+            var rxData = await CommsReceive(expectedLen);
+
+            // Check the length and header
+            if ((rxData.Length != expectedLen)
+                || (rxData[0] != addr)
+                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_DI)
+                || (rxData[2] != expectedDataCount))
+            {
+                throw new ModbusException(rxData);
+            }
+
+            // Check the CRC
+            crc = Crc16(rxData, expectedDataCount + 3);
+            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
+                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
+            {
+                throw new ModbusException("CRC failure");
+            }
+
+            // Populate the return buffer
+            byte bufferIdx = 3;
+            byte bitPos = 0;
+            bool[] rxInputs = new bool[len];
+            for (UInt16 i = 0; i < len; i++)
+            {
+                byte bitMask = (byte)(1 << bitPos);
+                rxInputs[i] = (rxData[bufferIdx] & bitMask) != 0;
+                if (++bitPos >= 8)
+                {
+                    bitPos = 0;
+                    bufferIdx++;
+                }
+            }
+
+            return rxInputs;
         }
 
-        public UInt16 ReadHoldingReg(byte addr, UInt16 regNo)
+        public async Task<UInt16> ReadHoldingReg(byte addr, UInt16 regNo)
         {
-            return ReadHoldingRegs(addr, regNo, 1)[0];
+            var hr = await ReadHoldingRegs(addr, regNo, 1);
+            return hr[0];
         }
 
         /**
          *	Command 3 - Read Holding Registers
          */
-        public UInt16[] ReadHoldingRegs(byte addr, UInt16 regStartNo, UInt16 len)
+        public async Task<UInt16[]> ReadHoldingRegs(byte addr, UInt16 regStartNo, UInt16 len)
         {
-            byte[] rxBuf = new byte[64];
-            int maxRegsRead = (rxBuf.Length - READ_HR_RX_OVERHEAD) / 2;
+            int maxRegsRead = (64 - READ_HR_RX_OVERHEAD) / 2;
 
             if (((regStartNo + len) > MAX_REG_NO)
                 || (len > maxRegsRead))
@@ -273,64 +308,61 @@ namespace VVG.Modbus
                 throw new ArgumentException();
             }
 
-            lock (_comms)
+            CommsPurge();
+
+            byte[] txData = new byte[READ_HR_TX_LEN];
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_READ_HR;
+            txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
+            txData[3] = (byte)(regStartNo & 0x00FF);
+            txData[4] = (byte)((len & 0xFF00) >> 8);
+            txData[5] = (byte)(len & 0x00FF);
+
+            UInt16 crc = Crc16(txData, 6);
+            txData[6] = (byte)(crc & 0x00FF);
+            txData[7] = (byte)((crc & 0xFF00) >> 8);
+
+            _comms.Write(txData, 0, READ_HR_TX_LEN);
+
+            int expectedLen = READ_HR_RX_OVERHEAD + (len * 2);
+            var rxData = await CommsReceive(expectedLen);
+
+            if ((rxData.Length != expectedLen)
+                || (rxData[0] != addr)
+                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_HR))
             {
-                _comms.ReadExisting();
-
-                byte[] txData = new byte[READ_HR_TX_LEN];
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_READ_HR;
-                txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
-                txData[3] = (byte)(regStartNo & 0x00FF);
-                txData[4] = (byte)((len & 0xFF00) >> 8);
-                txData[5] = (byte)(len & 0x00FF);
-
-                UInt16 crc = Crc16(txData, 6);
-                txData[6] = (byte)(crc & 0x00FF);
-                txData[7] = (byte)((crc & 0xFF00) >> 8);
-
-                _comms.Write(txData, 0, READ_HR_TX_LEN);
-
-                int expectedLen = READ_HR_RX_OVERHEAD + (len * 2);
-                int rcvLen = _comms.Read(rxBuf, 0, expectedLen);
-
-                if ((rcvLen != expectedLen)
-                    || (rxBuf[0] != addr)
-                    || (rxBuf[1] != (byte)ModbusCommands.MBCMD_READ_HR))
-                {
-                    throw new ModbusException(rxBuf, rcvLen);
-                }
-
-                crc = Crc16(rxBuf, rxBuf[2] + 3);
-                if (((crc & 0x00FF) != rxBuf[rxBuf[2] + 3])
-                    || (((crc & 0xFF00) >> 8) != rxBuf[rxBuf[2] + 4]))
-                {
-                    throw new ModbusException("CRC failure");
-                }
-
-                UInt16[] rxRegs = new UInt16[len];
-                for (UInt16 i = 0; i < len; i++)
-                {
-                    UInt16 reg = (UInt16)(((UInt16)rxBuf[3 + i * 2] << 8) + rxBuf[4 + i * 2]);
-                    rxRegs[i] = reg;
-                }
-
-                return rxRegs;
+                throw new ModbusException(rxData);
             }
+
+            crc = Crc16(rxData, rxData[2] + 3);
+            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
+                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
+            {
+                throw new ModbusException("CRC failure");
+            }
+
+            UInt16[] rxRegs = new UInt16[len];
+            for (UInt16 i = 0; i < len; i++)
+            {
+                UInt16 reg = (UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]);
+                rxRegs[i] = reg;
+            }
+
+            return rxRegs;
         }
 
-        public UInt16 ReadInputReg(byte addr, UInt16 regNo)
+        public async Task<UInt16> ReadInputReg(byte addr, UInt16 regNo)
         {
-            return ReadInputRegs(addr, regNo, 1)[0];
+            var ir = await ReadInputRegs(addr, regNo, 1);
+            return ir[0];
         }
 
         /**
          *	Command 4 - Read Input Registers
          */
-        public UInt16[] ReadInputRegs(byte addr, UInt16 regStartNo, UInt16 len)
+        public async Task<UInt16[]> ReadInputRegs(byte addr, UInt16 regStartNo, UInt16 len)
         {
-            byte[] rxBuf = new byte[64];
-            int maxRegsRead = (rxBuf.Length - READ_IR_RX_OVERHEAD) / 2;
+            int maxRegsRead = (64 - READ_IR_RX_OVERHEAD) / 2;
 
             if ((regStartNo > MAX_REG_NO)
                 || (len > maxRegsRead))
@@ -338,154 +370,143 @@ namespace VVG.Modbus
                 throw new ArgumentException();
             }
 
-            lock (_comms)
+            CommsPurge();
+
+            byte[] txData = new byte[READ_IR_TX_LEN];
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_READ_IR;
+            txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
+            txData[3] = (byte)(regStartNo & 0x00FF);
+            txData[4] = (byte)((len & 0xFF00) >> 8);
+            txData[5] = (byte)(len & 0x00FF);
+
+            UInt16 crc = Crc16(txData, 6);
+            txData[6] = (byte)(crc & 0x00FF);
+            txData[7] = (byte)((crc & 0xFF00) >> 8);
+
+            _comms.Write(txData, 0, READ_IR_TX_LEN);
+
+            int expectedLen = READ_IR_RX_OVERHEAD + (len * 2);
+            var rxData = await CommsReceive(expectedLen);
+
+            if ((rxData.Length != expectedLen)
+                || (rxData[0] != addr)
+                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_IR))
             {
-                _comms.ReadExisting();
-
-                byte[] txData = new byte[READ_IR_TX_LEN];
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_READ_IR;
-                txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
-                txData[3] = (byte)(regStartNo & 0x00FF);
-                txData[4] = (byte)((len & 0xFF00) >> 8);
-                txData[5] = (byte)(len & 0x00FF);
-
-                UInt16 crc = Crc16(txData, 6);
-                txData[6] = (byte)(crc & 0x00FF);
-                txData[7] = (byte)((crc & 0xFF00) >> 8);
-
-                _comms.Write(txData, 0, READ_IR_TX_LEN);
-
-                int expectedLen = READ_IR_RX_OVERHEAD + (len * 2);
-                int rcvLen = _comms.Read(rxBuf, 0, expectedLen);
-
-                if ((rcvLen != expectedLen)
-                    || (rxBuf[0] != addr)
-                    || (rxBuf[1] != (byte)ModbusCommands.MBCMD_READ_IR))
-                {
-                    throw new ModbusException(rxBuf, rcvLen);
-                }
-
-                crc = Crc16(rxBuf, rxBuf[2] + 3);
-                if (((crc & 0x00FF) != rxBuf[rxBuf[2] + 3])
-                    || (((crc & 0xFF00) >> 8) != rxBuf[rxBuf[2] + 4]))
-                {
-                    throw new ModbusException("CRC failure");
-                }
-
-                UInt16[] rxRegs = new UInt16[len];
-                for (UInt16 i = 0; i < len; i++)
-                {
-                    UInt16 reg = (UInt16)(((UInt16)rxBuf[3 + i * 2] << 8) + rxBuf[4 + i * 2]);
-                    rxRegs[i] = reg;
-                }
-
-                return rxRegs;
+                throw new ModbusException(rxData);
             }
+
+            crc = Crc16(rxData, rxData[2] + 3);
+            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
+                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
+            {
+                throw new ModbusException("CRC failure");
+            }
+
+            UInt16[] rxRegs = new UInt16[len];
+            for (UInt16 i = 0; i < len; i++)
+            {
+                UInt16 reg = (UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]);
+                rxRegs[i] = reg;
+            }
+
+            return rxRegs;
         }
 
         /**
          *	Command 5 - Write Single Coil
          */
-        public void WriteCoil(byte addr, UInt16 coilNo, bool txCoil)
+        public async Task WriteCoil(byte addr, UInt16 coilNo, bool txCoil)
         {
             if (coilNo > MAX_REG_NO)
             {
                 throw new ArgumentException();
             }
 
-            lock (_comms)
+            CommsPurge();
+
+            byte[] txData = new byte[WRITE_COIL_TX_LEN];
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_COIL_SINGLE;
+            txData[2] = (byte)((coilNo & 0xFF00) >> 8);
+            txData[3] = (byte)(coilNo & 0x00FF);
+            txData[4] = (byte)(txCoil ? 0xff : 0x00);
+            txData[5] = (byte)0x00;
+
+            UInt16 crc = Crc16(txData, 6);
+            txData[6] = (byte)(crc & 0x00FF);
+            txData[7] = (byte)((crc & 0xFF00) >> 8);
+            _comms.Write(txData, 0, WRITE_COIL_TX_LEN);
+
+            var rxData = await CommsReceive(WRITE_COIL_RX_LEN);
+
+            if (rxData.Length != WRITE_COIL_RX_LEN)
             {
-                _comms.ReadExisting();
-
-                byte[] txData = new byte[WRITE_COIL_TX_LEN];
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_WRITE_COIL_SINGLE;
-                txData[2] = (byte)((coilNo & 0xFF00) >> 8);
-                txData[3] = (byte)(coilNo & 0x00FF);
-                txData[4] = (byte)(txCoil ? 0xff : 0x00);
-                txData[5] = (byte)0x00;
-
-                UInt16 crc = Crc16(txData, 6);
-                txData[6] = (byte)(crc & 0x00FF);
-                txData[7] = (byte)((crc & 0xFF00) >> 8);
-                _comms.Write(txData, 0, WRITE_COIL_TX_LEN);
-
-                byte[] rxBuf = new byte[WRITE_COIL_RX_LEN];
-                int rcvLen = _comms.Read(rxBuf, 0, WRITE_COIL_RX_LEN);
-
-                if (rcvLen != WRITE_COIL_RX_LEN)
-                {
-                    throw new ModbusException(rxBuf, rcvLen);
-                }
-
-                // check the command was echoed back as sent
-                for (UInt16 i = 0; i < WRITE_COIL_RX_LEN; i++)
-                {
-                    if (txData[i] != rxBuf[i])
-                    {
-                        // Mismatch - fail :(
-                        throw new ModbusException("Failed to validate response");
-                    }
-                }
-
-                // All data matched - success!
+                throw new ModbusException(rxData);
             }
+
+            // check the command was echoed back as sent
+            for (UInt16 i = 0; i < WRITE_COIL_RX_LEN; i++)
+            {
+                if (txData[i] != rxData[i])
+                {
+                    // Mismatch - fail :(
+                    throw new ModbusException("Failed to validate response");
+                }
+            }
+
+            // All data matched - success!
         }
 
         /**
          *	Command 6 - Write Single Holding Register
          */
-        public void WriteHoldingReg(byte addr, UInt16 regNo, UInt16 txReg)
+        public async Task WriteHoldingReg(byte addr, UInt16 regNo, UInt16 txReg)
         {
             if (regNo > MAX_REG_NO)
             {
                 throw new ArgumentException();
             }
 
-            lock (_comms)
+            CommsPurge();
+
+            byte[] txData = new byte[WRITE_HR_TX_LEN];
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_HR_SINGLE;
+            txData[2] = (byte)((regNo & 0xFF00) >> 8);
+            txData[3] = (byte)(regNo & 0x00FF);
+            txData[4] = (byte)((txReg & 0xFF00) >> 8);
+            txData[5] = (byte)(txReg & 0x00FF);
+
+            UInt16 crc = Crc16(txData, 6);
+            txData[6] = (byte)(crc & 0x00FF);
+            txData[7] = (byte)((crc & 0xFF00) >> 8);
+            _comms.Write(txData, 0, WRITE_HR_TX_LEN);
+
+            var rxData = await CommsReceive(WRITE_HR_RX_LEN);
+
+            if (rxData.Length != WRITE_HR_RX_LEN)
             {
-                _comms.ReadExisting();
-
-                byte[] txData = new byte[WRITE_HR_TX_LEN];
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_WRITE_HR_SINGLE;
-                txData[2] = (byte)((regNo & 0xFF00) >> 8);
-                txData[3] = (byte)(regNo & 0x00FF);
-                txData[4] = (byte)((txReg & 0xFF00) >> 8);
-                txData[5] = (byte)(txReg & 0x00FF);
-
-                UInt16 crc = Crc16(txData, 6);
-                txData[6] = (byte)(crc & 0x00FF);
-                txData[7] = (byte)((crc & 0xFF00) >> 8);
-                _comms.Write(txData, 0, WRITE_HR_TX_LEN);
-
-                byte[] rxBuf = new byte[WRITE_HR_RX_LEN];
-                int rcvLen = _comms.Read(rxBuf, 0, WRITE_HR_RX_LEN);
-
-                if (rcvLen != rxBuf.Length)
-                {
-                    throw new ModbusException(rxBuf, rcvLen);
-                }
-
-                // check the command was echoed back as sent
-                for (UInt16 i = 0; i < rxBuf.Length; i++)
-                {
-                    if (txData[i] != rxBuf[i])
-                    {
-                        // Mismatch - fail :(
-                        throw new ModbusException("Failed to validate response");
-                    }
-                }
-
-                // All data matched - success!
+                throw new ModbusException(rxData);
             }
+
+            // check the command was echoed back as sent
+            for (UInt16 i = 0; i < rxData.Length; i++)
+            {
+                if (txData[i] != rxData[i])
+                {
+                    // Mismatch - fail :(
+                    throw new ModbusException("Failed to validate response");
+                }
+            }
+
+            // All data matched - success!
         }
 
         /**
          *	Command 15 - Write Coils (multiple)
          */
-        public void WriteCoils(byte addr, UInt16 coilStartNo, bool[] txCoils)
+        public async Task WriteCoils(byte addr, UInt16 coilStartNo, bool[] txCoils)
         {
             byte[] txData = new byte[32];
             int maxCoilWrite = (txData.Length - WRITE_COILS_TX_OVERHEAD) * 8;
@@ -496,82 +517,78 @@ namespace VVG.Modbus
                 throw new ArgumentException();
 	        }
 
-            lock (_comms)
+            CommsPurge();
+
+            // Prepare the header
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_COIL_MULTIPLE;
+            txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
+            txData[3] = (byte)(coilStartNo & 0x00FF);
+            txData[4] = (byte)((txCoils.Length & 0xFF00) >> 8);
+            txData[5] = (byte)(txCoils.Length & 0x00FF);
+            // txData[6] to be filled with number of bytes after filling the buffer
+
+            // Populate the txCoils on to the transmit buffer
+            byte txLen = 7;
+            txData[txLen] = 0;
+            byte bitPos = 0;
+            for (UInt16 i = 0; i < txCoils.Length; i++)
             {
-                _comms.ReadExisting();
-
-                // Prepare the header
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_WRITE_COIL_MULTIPLE;
-                txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
-                txData[3] = (byte)(coilStartNo & 0x00FF);
-                txData[4] = (byte)((txCoils.Length & 0xFF00) >> 8);
-                txData[5] = (byte)(txCoils.Length & 0x00FF);
-                // txData[6] to be filled with number of bytes after filling the buffer
-
-                // Populate the txCoils on to the transmit buffer
-                byte txLen = 7;
-                txData[txLen] = 0;
-                byte bitPos = 0;
-                for (UInt16 i = 0; i < txCoils.Length; i++)
+                txData[txLen] <<= 1;
+                if (txCoils[i])
                 {
-                    txData[txLen] <<= 1;
-                    if (txCoils[i])
-                    {
-                        txData[txLen] |= 1;
-                    }
-
-                    if (++bitPos >= 8)
-                    {
-                        bitPos = 0;
-                        txLen++;
-                        txData[txLen] = 0;
-                    }
+                    txData[txLen] |= 1;
                 }
 
-                // If the final byte is partially filled, add it to the length
-                if (bitPos > 0)
+                if (++bitPos >= 8)
                 {
+                    bitPos = 0;
                     txLen++;
+                    txData[txLen] = 0;
                 }
-                txData[6] = (byte)(txLen - 6);
+            }
 
-                UInt16 crc = Crc16(txData, txLen);
-                txData[txLen++] = (byte)(crc & 0x00FF);
-                txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
-                _comms.Write(txData, 0, txLen);
+            // If the final byte is partially filled, add it to the length
+            if (bitPos > 0)
+            {
+                txLen++;
+            }
+            txData[6] = (byte)(txLen - 6);
 
-                byte[] rxBuf = new byte[WRITE_COILS_RX_LEN];
-                int rcvLen = _comms.Read(rxBuf, 0, WRITE_COILS_RX_LEN);
+            UInt16 crc = Crc16(txData, txLen);
+            txData[txLen++] = (byte)(crc & 0x00FF);
+            txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
+            _comms.Write(txData, 0, txLen);
 
-                if (rcvLen != rxBuf.Length)
+            var rxData = await CommsReceive(WRITE_COILS_RX_LEN);
+
+            if (rxData.Length != WRITE_COILS_RX_LEN)
+            {
+                throw new ModbusException(rxData);
+            }
+
+            // Verify echo-back (excl. CRC)
+            for (int i = 0; i < rxData.Length - 2; i++)
+            {
+                if (txData[i] != rxData[i])
                 {
-                    throw new ModbusException(rxBuf, rcvLen);
+                    throw new ModbusException("Echo-back verification failed");
                 }
+            }
 
-                // Verify echo-back (excl. CRC)
-                for (int i = 0; i < rxBuf.Length - 2; i++)
-                {
-                    if (txData[i] != rxBuf[i])
-                    {
-                        throw new ModbusException("Echo-back verification failed");
-                    }
-                }
-
-                // Verify CRC
-                crc = Crc16(rxBuf, rxBuf.Length - 2);
-                if (((crc & 0x00FF) != rxBuf[rxBuf.Length - 2])
-                    || (((crc & 0xFF00) >> 8) != rxBuf[rxBuf.Length - 1]))
-                {
-                    throw new ModbusException("CRC fail");
-                }
+            // Verify CRC
+            crc = Crc16(rxData, rxData.Length - 2);
+            if (((crc & 0x00FF) != rxData[rxData.Length - 2])
+                || (((crc & 0xFF00) >> 8) != rxData[rxData.Length - 1]))
+            {
+                throw new ModbusException("CRC fail");
             }
         }
 
         /**
          *	Command 16 - Write Holding Registers (multiple)
          */
-        public void WriteHoldingRegs(byte addr, UInt16 regStartNo, UInt16[] txRegs)
+        public async Task WriteHoldingRegs(byte addr, UInt16 regStartNo, UInt16[] txRegs)
         {
             // TODO make this dynamic
             byte[] txData = new byte[64];
@@ -584,56 +601,52 @@ namespace VVG.Modbus
                 throw new ArgumentException();
             }
 
-            lock (_comms)
+            CommsPurge();
+
+            // Prepare the header
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_HR_MULTIPLE;
+            txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
+            txData[3] = (byte)(regStartNo & 0x00FF);
+            txData[4] = (byte)((txRegs.Length & 0xFF00) >> 8);
+            txData[5] = (byte)(txRegs.Length & 0x00FF);
+            txData[6] = (byte)(txRegs.Length * 2);  // number of *bytes*
+
+            // Populate the txCoils on to the transmit buffer
+            for (UInt16 i = 0; i < txRegs.Length; i++)
             {
-                _comms.ReadExisting();
+                txData[6 + (i * 2)] = (byte)((txRegs[i] & 0xFF00) >> 8);
+                txData[7 + (i * 2)] = (byte)(txRegs[i] & 0x00FF);
+            }
 
-                // Prepare the header
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_WRITE_HR_MULTIPLE;
-                txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
-                txData[3] = (byte)(regStartNo & 0x00FF);
-                txData[4] = (byte)((txRegs.Length & 0xFF00) >> 8);
-                txData[5] = (byte)(txRegs.Length & 0x00FF);
-                txData[6] = (byte)(txRegs.Length * 2);  // number of *bytes*
+            int txLen = WRITE_HRS_TX_OVERHEAD - 2 + (txRegs.Length * 2);
+            UInt16 crc = Crc16(txData, txLen);
+            txData[txLen++] = (byte)(crc & 0x00FF);
+            txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
+            _comms.Write(txData, 0, txLen);
 
-                // Populate the txCoils on to the transmit buffer
-                for (UInt16 i = 0; i < txRegs.Length; i++)
+            var rxData = await CommsReceive(WRITE_HRS_RX_LEN);
+
+            if (rxData.Length != WRITE_HRS_RX_LEN)
+            {
+                throw new ModbusException(rxData);
+            }
+
+            // Verify echo-back (excl. CRC)
+            for (int i = 0; i < WRITE_HRS_RX_LEN - 2; i++)
+            {
+                if (txData[i] != rxData[i])
                 {
-                    txData[6 + (i * 2)] = (byte)((txRegs[i] & 0xFF00) >> 8);
-                    txData[7 + (i * 2)] = (byte)(txRegs[i] & 0x00FF);
+                    throw new ModbusException("Read-back failure");
                 }
+            }
 
-                int txLen = WRITE_HRS_TX_OVERHEAD - 2 + (txRegs.Length * 2);
-                UInt16 crc = Crc16(txData, txLen);
-                txData[txLen++] = (byte)(crc & 0x00FF);
-                txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
-                _comms.Write(txData, 0, txLen);
-
-                byte[] rxBuf = new byte[WRITE_HRS_RX_LEN];
-                int rcvLen = _comms.Read(rxBuf, 0, WRITE_HRS_RX_LEN);
-
-                if (rcvLen != rxBuf.Length)
-                {
-                    throw new ModbusException(rxBuf, rcvLen);
-                }
-
-                // Verify echo-back (excl. CRC)
-                for (int i = 0; i < WRITE_HRS_RX_LEN - 2; i++)
-                {
-                    if (txData[i] != rxBuf[i])
-                    {
-                        throw new ModbusException("Read-back failure");
-                    }
-                }
-
-                // Verify CRC
-                crc = Crc16(rxBuf, rxBuf.Length - 2);
-                if (((crc & 0x00FF) != rxBuf[rxBuf.Length - 2])
-                    || (((crc & 0xFF00) >> 8) != rxBuf[rxBuf.Length - 1]))
-                {
-                    throw new ModbusException("CRC failure");
-                }
+            // Verify CRC
+            crc = Crc16(rxData, rxData.Length - 2);
+            if (((crc & 0x00FF) != rxData[rxData.Length - 2])
+                || (((crc & 0xFF00) >> 8) != rxData[rxData.Length - 1]))
+            {
+                throw new ModbusException("CRC failure");
             }
         }
 
@@ -646,59 +659,55 @@ namespace VVG.Modbus
          *	@param[in]	len		Length (in bytes) to read
          *	@param[out]	txFileRecs	Records read from file
          */
-        public byte[] ReadFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, UInt16 len)
+        public async Task<byte[]> ReadFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, UInt16 len)
         {
             byte[] txData = new byte[READ_FILE_RECORD_TX_LEN];
-            byte[] rxData = new byte[READ_FILE_RECORD_RX_OVERHEAD + len];
 
-            lock (_comms)
+            CommsPurge();
+
+            // Form the request
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_READ_FILE_RECORD;
+            txData[2] = (byte)(READ_FILE_RECORD_TX_LEN - 3 + len); // PDU length
+            txData[3] = (byte)6;  // Reference type is always 6
+            txData[4] = (byte)((fileNo & 0xFF00) >> 8);
+            txData[5] = (byte)(fileNo & 0x00FF);
+            txData[6] = (byte)((recNo & 0xFF00) >> 8);
+            txData[7] = (byte)(recNo & 0x00FF);
+            txData[8] = (byte)(((len / 2) & 0xFF00) >> 8);
+            txData[9] = (byte)((len / 2) & 0x00FF);  // record length = byte length / 2
+
+            UInt16 crc = Crc16(txData, 10);
+            txData[10] = (byte)(crc & 0x00FF);
+            txData[11] = (byte)((crc & 0xFF00) >> 8);
+
+            // Send the request
+            _comms.Write(txData, 0, READ_FILE_RECORD_TX_LEN);
+
+            // Get the response
+            int expectedLen = (READ_FILE_RECORD_RX_OVERHEAD + len);
+            var rxData = await CommsReceive(expectedLen);
+
+            // Validate the response
+            if ((rxData.Length != expectedLen)
+                || (rxData[0] != addr)
+                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_FILE_RECORD))
             {
-                _comms.ReadExisting();
-
-                // Form the request
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_READ_FILE_RECORD;
-                txData[2] = (byte)(READ_FILE_RECORD_TX_LEN - 3 + len);
-                txData[3] = (byte)6;  // Reference type is always 6
-                txData[4] = (byte)((fileNo & 0xFF00) >> 8);
-                txData[5] = (byte)(fileNo & 0x00FF);
-                txData[6] = (byte)((recNo & 0xFF00) >> 8);
-                txData[7] = (byte)(recNo & 0x00FF);
-                txData[8] = (byte)(((len / 2) & 0xFF00) >> 8);
-                txData[9] = (byte)((len / 2) & 0x00FF);  // record length = byte length / 2
-
-                UInt16 crc = Crc16(txData, 10);
-                txData[10] = (byte)(crc & 0x00FF);
-                txData[11] = (byte)((crc & 0xFF00) >> 8);
-
-                // Send the request
-                _comms.Write(txData, 0, READ_FILE_RECORD_TX_LEN);
-
-                // Get the response
-                int expectedLen = (READ_FILE_RECORD_RX_OVERHEAD + len);
-                int rcvLen = _comms.Read(rxData, 0, expectedLen);
-
-                // Validate the response
-                if ((rcvLen != expectedLen)
-                    || (rxData[0] != addr)
-                    || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_FILE_RECORD))
-                {
-                    throw new ModbusException(rxData, rcvLen);
-                }
-
-                crc = Crc16(rxData, rxData[2] + 3);
-                if (((crc & 0x00FF) != rxData[rxData[2] + 3])
-                    || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
-                {
-                    throw new ModbusException("CRC failure");
-                }
-
-                // Copy the record data back to the passed buffer
-                var rxRecs = new byte[len];
-                Array.Copy(rxData, READ_FILE_RECORD_RX_OVERHEAD - 2, rxRecs, 0, len);
-
-                return rxRecs;
+                throw new ModbusException(rxData);
             }
+
+            crc = Crc16(rxData, rxData[2] + 3);
+            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
+                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
+            {
+                throw new ModbusException("CRC failure");
+            }
+
+            // Copy the record data back to the passed buffer
+            var rxRecs = new byte[len];
+            Array.Copy(rxData, READ_FILE_RECORD_RX_OVERHEAD - 2, rxRecs, 0, len);
+
+            return rxRecs;
         }
 
         /**
@@ -710,7 +719,7 @@ namespace VVG.Modbus
          *	@param[in]	len		Length (in bytes) to write
          *	@param[in]	txFileRecs	Records to write to file
          */
-        public void WriteFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, byte[] txFileRecs)
+        public async Task WriteFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, byte[] txFileRecs)
         {
             if ((txFileRecs.Length == 0) || (txFileRecs.Length > (255 - WRITE_FILE_RECORD_TX_OVERHEAD)))
             {
@@ -718,49 +727,45 @@ namespace VVG.Modbus
             }
 
             byte[] txData = new byte[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length];
-            byte[] rxData = new byte[WRITE_FILE_RECORD_RX_OVERHEAD + txFileRecs.Length];
             
-            lock (_comms)
+            CommsPurge();
+
+            // Form the request
+            txData[0] = addr;
+            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_FILE_RECORD;
+            txData[2] = (byte)(WRITE_FILE_RECORD_TX_OVERHEAD - 3 + txFileRecs.Length);
+            txData[3] = (byte)6;  // Reference type is always 6
+            txData[4] = (byte)((fileNo & 0xFF00) >> 8);
+            txData[5] = (byte)(fileNo & 0x00FF);
+            txData[6] = (byte)((recNo & 0xFF00) >> 8);
+            txData[7] = (byte)(recNo & 0x00FF);
+            txData[8] = (byte)(((txFileRecs.Length / 2) & 0xFF00) >> 8);
+            txData[9] = (byte)((txFileRecs.Length / 2) & 0x00FF);  // record length = byte length / 2
+
+            Array.Copy(txFileRecs, 0, txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2, txFileRecs.Length);
+
+            UInt16 crc = Crc16(txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2 + txFileRecs.Length);
+            txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 2] = (byte)(crc & 0x00FF);
+            txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 1] = (byte)((crc & 0xFF00) >> 8);
+
+            // Send the request
+            _comms.Write(txData, 0, WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
+
+            // Get the response
+            var rxData = await CommsReceive(WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
+
+            // Validate the response
+            if (rxData.Length != (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length))
             {
-                _comms.ReadExisting();
+                throw new ModbusException(rxData);
+            }
 
-                // Form the request
-                txData[0] = addr;
-                txData[1] = (byte)ModbusCommands.MBCMD_WRITE_FILE_RECORD;
-                txData[2] = (byte)(WRITE_FILE_RECORD_TX_OVERHEAD - 3 + txFileRecs.Length);
-                txData[3] = (byte)6;  // Reference type is always 6
-                txData[4] = (byte)((fileNo & 0xFF00) >> 8);
-                txData[5] = (byte)(fileNo & 0x00FF);
-                txData[6] = (byte)((recNo & 0xFF00) >> 8);
-                txData[7] = (byte)(recNo & 0x00FF);
-                txData[8] = (byte)(((txFileRecs.Length / 2) & 0xFF00) >> 8);
-                txData[9] = (byte)((txFileRecs.Length / 2) & 0x00FF);  // record length = byte length / 2
-
-                Array.Copy(txFileRecs, 0, txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2, txFileRecs.Length);
-
-                UInt16 crc = Crc16(txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2 + txFileRecs.Length);
-                txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 2] = (byte)(crc & 0x00FF);
-                txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 1] = (byte)((crc & 0xFF00) >> 8);
-
-                // Send the request
-                _comms.Write(txData, 0, WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
-
-                // Get the response
-                int rcvLen = _comms.Read(rxData, 0, (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length));
-
-                // Validate the response
-                if (rcvLen != (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length))
+            // Verify echo-back (inc. CRC)
+            for (int i = 0; i < (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length); i++)
+            {
+                if (txData[i] != rxData[i])
                 {
-                    throw new ModbusException(rxData, rcvLen);
-                }
-
-                // Verify echo-back (inc. CRC)
-                for (int i = 0; i < (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length); i++)
-                {
-                    if (txData[i] != rxData[i])
-                    {
-                        throw new ModbusException("Read-back verification failed");
-                    }
+                    throw new ModbusException("Read-back verification failed");
                 }
             }
         }
@@ -808,7 +813,7 @@ namespace VVG.Modbus
             int i = 0;
             while (len-- > 0)
             {
-                temp = (byte)(data[i] ^ crc);
+                temp = (byte)(data[i++] ^ crc);
                 crc >>= 8;
                 crc ^= CRC16_TABLE[temp];
             }
