@@ -44,6 +44,13 @@ namespace VVG.Modbus.ClientTest
                 cboSerialPort.Items.Add(port);
             }
             cboSerialPort.SelectedIndex = 0;
+
+            cboParity.Items.Clear();
+            foreach (var parity in Enum.GetNames(typeof(Parity)))
+            {
+                cboParity.Items.Add(parity);
+            }
+            cboParity.SelectedIndex = 0;
         }
 
         public void UpdateProgress(float percent)
@@ -83,9 +90,12 @@ namespace VVG.Modbus.ClientTest
         {
             try
             {
-                _port = new SerialPort((string)cboSerialPort.SelectedItem);
+                _port = new SerialPort((string)cboSerialPort.SelectedItem)
+                {
+                    BaudRate = int.Parse(txtBaudRate.Text),
+                    Parity = (Parity)Enum.Parse(typeof(Parity), (string)cboParity.SelectedItem)
+                };
                 _port.Open();
-                _port.ReadTimeout = 100;
                 _slave.Client = new ClientRTU(_port);
 
                 lblStatus.Content = "Connected";
@@ -171,8 +181,7 @@ namespace VVG.Modbus.ClientTest
                 byte[] readRecs;
                 try
                 {
-                    //readRecs = await Task.Run<byte[]>(() => _slave.ReadFileRecord(fileNum, recNum, thisNumRecs));
-                    readRecs = _slave.ReadFileRecord(fileNum, recNum, thisNumRecs);
+                    readRecs = await _slave.ReadFileRecord(fileNum, recNum, thisNumRecs);
                 }
                 catch (Exception ex)
                 {
@@ -256,8 +265,7 @@ namespace VVG.Modbus.ClientTest
                 Array.Copy(fileBytes, (startingRecNum - recNum) * 2, writeRecs, 0, writeRecs.Length);
                 try
                 {
-                    //await Task.Run(() => _slave.WriteFileRecord(fileNum, recNum, writeRecs));
-                    _slave.WriteFileRecord(fileNum, recNum, writeRecs);
+                    await _slave.WriteFileRecord(fileNum, recNum, writeRecs);
                 }
                 catch (Exception ex)
                 {
@@ -305,6 +313,20 @@ namespace VVG.Modbus.ClientTest
                 {
                     lblFileBytes.Content = (recNum * 2).ToString();
                 }
+            }
+            else
+            {
+                tb.Background = Brushes.LightSalmon;
+            }
+        }
+
+        private void txtBaudRate_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var tb = (TextBox)sender;
+            int baud;
+            if (int.TryParse(tb.Text, out baud))
+            {
+                tb.Background = Brushes.LightGreen;
             }
             else
             {

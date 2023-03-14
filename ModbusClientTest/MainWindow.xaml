@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VVG.Modbus.ClientTest"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
+        Title="MainWindow" Height="350" Width="600">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
@@ -14,11 +14,15 @@
         </Grid.RowDefinitions>
 
         <Label Content="Serial Port" VerticalAlignment="Center" />
-        <ComboBox x:Name="cboSerialPort" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="70,0,0,0" Width="70" />
-        <Label Content="Slave ID" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="150,0,0,0" />
-        <TextBox x:Name="txtSlaveID" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="210,0,0,0" Width="50" TextChanged="txtSlaveID_TextChanged" Text="1" />
-        <Button x:Name="cmdConnect" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="280,0,0,0" Width="70" Content="Connect" Click="cmdConnect_Click" />
-        <Button x:Name="cmdDisconnect" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="360,0,0,0" Width="70" Content="Disconnect" IsEnabled="False" Click="cmdDisconnect_Click" />
+        <ComboBox x:Name="cboSerialPort" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="65,0,0,0" Width="60" />
+        <Label Content="Baud" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="125,0,0,0" />
+        <TextBox x:Name="txtBaudRate" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="165,0,0,0" Width="60" Text="115200" TextChanged="txtBaudRate_TextChanged" />
+        <Label Content="Parity" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="225,0,0,0" />
+        <ComboBox x:Name="cboParity" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="265,0,0,0" Width="60" />
+        <Label Content="Slave ID" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="330,0,0,0" />
+        <TextBox x:Name="txtSlaveID" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="380,0,0,0" Width="30" TextChanged="txtSlaveID_TextChanged" Text="1" />
+        <Button x:Name="cmdConnect" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="420,0,0,0" Width="70" Content="Connect" Click="cmdConnect_Click" />
+        <Button x:Name="cmdDisconnect" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="500,0,0,0" Width="70" Content="Disconnect" IsEnabled="False" Click="cmdDisconnect_Click" />
 
         <TabControl Grid.Row="1" IsEnabled="False" x:Name="tabs">
             <TabItem Header="File">
