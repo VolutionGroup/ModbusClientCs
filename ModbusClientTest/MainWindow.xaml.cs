@@ -66,7 +66,7 @@ namespace VVG.Modbus.ClientTest
 
             Dispatcher.BeginInvoke(new Action(() => 
             {
-                lblProgress.Content = percent.ToString("0.0%");
+                lblProgress.Content = percent.ToString("0.0") + '%';
                 progBar.Value = percent;
             }));
         }
@@ -130,19 +130,14 @@ namespace VVG.Modbus.ClientTest
                 {
                     txtFilename.Text = dlgOpenFile.FileName;
                     var fileLength = new FileInfo(dlgOpenFile.FileName).Length;
-                    var recs = fileLength / 2;
-                    if ((fileLength % 2) > 0)
-                    {
-                        recs++;
-                    }
-                    txtNumRecs.Text = recs.ToString();
+                    txtLen.Text = fileLength.ToString();
                 }
             }
         }
 
         private async void cmdReadFile_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 fileNum, recNum, numRecs;
+            UInt16 fileNum, recNum, len;
             if (false == UInt16.TryParse(txtFileNum.Text, out fileNum))
             {
                 MessageBox.Show("Failed to parse File Number", "Fail");
@@ -153,9 +148,9 @@ namespace VVG.Modbus.ClientTest
                 MessageBox.Show("Failed to parse Record Number", "Fail");
                 return;
             }
-            if (false == UInt16.TryParse(txtNumRecs.Text, out numRecs))
+            if (false == UInt16.TryParse(txtLen.Text, out len))
             {
-                MessageBox.Show("Failed to parse Number of Rec", "Fail");
+                MessageBox.Show("Failed to parse Length (bytes)", "Fail");
                 return;
             }
 
@@ -167,17 +162,17 @@ namespace VVG.Modbus.ClientTest
                 }
             }
 
-            var readFile = new byte[numRecs * 2];
+            var readFile = new byte[len * 2];
             int startingRecNum = recNum;
-            int totalRecs = numRecs;
+            int totalRecs = len;
             int retries = 0;
             
-            while (numRecs > 0)
+            while (len > 0)
             {
-                UpdateProgress(100 * (totalRecs - numRecs) / totalRecs);
+                UpdateProgress(100 * (totalRecs - len) / totalRecs);
 
-                // Limit to 64 records (128 bytes) per request
-                UInt16 thisNumRecs = (numRecs > 64) ? (UInt16)64 : numRecs;
+                // Limit to 128 bytes per request
+                UInt16 thisNumRecs = (len > 128) ? (UInt16)128 : len;
                 byte[] readRecs;
                 try
                 {
@@ -187,7 +182,7 @@ namespace VVG.Modbus.ClientTest
                 {
                     if (++retries > 5)
                     {
-                        MessageBox.Show(String.Format("Failed to read file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}",(totalRecs - numRecs), totalRecs, ex), "Fail");
+                        MessageBox.Show(String.Format("Failed to read file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}",(totalRecs - len), totalRecs, ex), "Fail");
                         return;
                     }
                     continue;
@@ -195,8 +190,8 @@ namespace VVG.Modbus.ClientTest
 
                 if (readRecs.Length == thisNumRecs)
                 {
-                    Array.Copy(readRecs, 0, readFile, (startingRecNum - recNum) * 2, thisNumRecs * 2);
-                    numRecs += thisNumRecs;
+                    Array.Copy(readRecs, 0, readFile, (startingRecNum - recNum), thisNumRecs);
+                    len -= thisNumRecs;
                     retries = 0;
                 }
             }
@@ -214,7 +209,7 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdWriteFile_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 fileNum, recNum, numRecs;
+            UInt16 fileNum, recNum, len;
             if (false == UInt16.TryParse(txtFileNum.Text, out fileNum))
             {
                 MessageBox.Show("Failed to parse File Number", "Fail");
@@ -225,9 +220,9 @@ namespace VVG.Modbus.ClientTest
                 MessageBox.Show("Failed to parse Record Number", "Fail");
                 return;
             }
-            if (false == UInt16.TryParse(txtNumRecs.Text, out numRecs))
+            if (false == UInt16.TryParse(txtLen.Text, out len))
             {
-                MessageBox.Show("Failed to parse Number of Rec", "Fail");
+                MessageBox.Show("Failed to parse Length", "Fail");
                 return;
             }
 
@@ -239,30 +234,25 @@ namespace VVG.Modbus.ClientTest
 
             byte[] fileBytes = File.ReadAllBytes(txtFilename.Text);
             
-            if (fileBytes.Length < (numRecs * 2))
+            if (fileBytes.Length < len)
             {
                 if (MessageBox.Show("Insufficient bytes in file for requested send size - reduce to match file size?", "Size mis-match", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 {
                     return;
                 }
-                numRecs = (UInt16)(fileBytes.Length / 2);
-                if ((fileBytes.Length % 2) > 0)
-                {
-                    numRecs++;
-                }
+                len = (UInt16)fileBytes.Length;
             }
 
-            int startingRecNum = recNum;
-            int totalRecs = numRecs;
+            int totalLen = len;
             int retries = 0;
 
-            while (numRecs > 0)
+            while (len > 0)
             {
-                UpdateProgress(100 * (totalRecs - numRecs) / totalRecs);
+                UpdateProgress(100 * (totalLen - len) / totalLen);
 
-                // Limit to 64 records (128 bytes) per request
-                var writeRecs = new byte[((numRecs > 64) ? 64 : numRecs) * 2];
-                Array.Copy(fileBytes, (startingRecNum - recNum) * 2, writeRecs, 0, writeRecs.Length);
+                // Limit to 128 bytes per request
+                var writeRecs = new byte[(len > 128) ? 128 : len];
+                Array.Copy(fileBytes, (totalLen - len), writeRecs, 0, writeRecs.Length);
                 try
                 {
                     await _slave.WriteFileRecord(fileNum, recNum, writeRecs);
@@ -271,13 +261,13 @@ namespace VVG.Modbus.ClientTest
                 {
                     if (++retries > 5)
                     {
-                        MessageBox.Show(String.Format("Failed to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}", (totalRecs - numRecs), totalRecs, ex), "Fail");
+                        MessageBox.Show(String.Format("Failed to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}", (totalLen - len), totalLen, ex), "Fail");
                         return;
                     }
                     continue;
                 }
 
-                numRecs += (UInt16)(writeRecs.Length / 2);
+                len += (UInt16)writeRecs.Length;
                 retries = 0;
             }
 
@@ -301,18 +291,14 @@ namespace VVG.Modbus.ClientTest
                 tb.Background = Brushes.LightSalmon;
             }
         }
-
-        private void txtNumRecs_TextChanged(object sender, TextChangedEventArgs e)
+        
+        private void txtBaudRate_TextChanged(object sender, TextChangedEventArgs e)
         {
             var tb = (TextBox)sender;
-            UInt16 recNum;
-            if (UInt16.TryParse(tb.Text, out recNum))
+            int baud;
+            if (int.TryParse(tb.Text, out baud))
             {
                 tb.Background = Brushes.LightGreen;
-                if (lblFileBytes != null) // trap initialisation issue
-                {
-                    lblFileBytes.Content = (recNum * 2).ToString();
-                }
             }
             else
             {
@@ -320,11 +306,11 @@ namespace VVG.Modbus.ClientTest
             }
         }
 
-        private void txtBaudRate_TextChanged(object sender, TextChangedEventArgs e)
+        private void txtLen_TextChanged(object sender, TextChangedEventArgs e)
         {
             var tb = (TextBox)sender;
-            int baud;
-            if (int.TryParse(tb.Text, out baud))
+            UInt16 len;
+            if (UInt16.TryParse(tb.Text, out len))
             {
                 tb.Background = Brushes.LightGreen;
             }

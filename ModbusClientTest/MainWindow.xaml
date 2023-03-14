@@ -50,9 +50,8 @@
                     <TextBox x:Name="txtRecNum" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="0" TextChanged="txtRecNum_TextChanged" />
                     <Label x:Name="lblFileByteOffset" VerticalAlignment="Center" Grid.Column="2" Grid.Row="1" Content="0" />
 
-                    <Label Content="Number of Recs" VerticalAlignment="Center" Grid.Row="2" />
-                    <TextBox x:Name="txtNumRecs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Text="0" TextChanged="txtNumRecs_TextChanged" />
-                    <Label x:Name="lblFileBytes" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="0" />
+                    <Label Content="Length (bytes)" VerticalAlignment="Center" Grid.Row="2" />
+                    <TextBox x:Name="txtLen" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Text="0" TextChanged="txtLen_TextChanged" />
 
                     <Label Content="Local filename" VerticalAlignment="Center" Grid.Row="3" />
                     <TextBox x:Name="txtFilename" VerticalAlignment="Center" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" />
