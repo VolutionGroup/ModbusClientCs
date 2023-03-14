@@ -40,7 +40,7 @@ namespace VVG.Modbus
         const byte WRITE_HRS_RX_LEN = 8;
 
         const byte READ_FILE_RECORD_TX_LEN = 12;
-        const byte READ_FILE_RECORD_RX_OVERHEAD = 7;
+        const byte READ_FILE_RECORD_RX_OVERHEAD = 12;
 
         const byte WRITE_FILE_RECORD_TX_OVERHEAD = 12;
         const byte WRITE_FILE_RECORD_RX_OVERHEAD = 12;    // command echoed back
@@ -663,12 +663,18 @@ namespace VVG.Modbus
         {
             byte[] txData = new byte[READ_FILE_RECORD_TX_LEN];
 
+            if ((len % 2) > 0)
+            {
+                // Needs to be a whole number of UInt16
+                len++;
+            }
+
             CommsPurge();
 
             // Form the request
             txData[0] = addr;
             txData[1] = (byte)ModbusCommands.MBCMD_READ_FILE_RECORD;
-            txData[2] = (byte)(READ_FILE_RECORD_TX_LEN - 3 + len); // PDU length
+            txData[2] = (byte)READ_FILE_RECORD_TX_LEN - 5; // PDU length (exc addr, func, len, crc)
             txData[3] = (byte)6;  // Reference type is always 6
             txData[4] = (byte)((fileNo & 0xFF00) >> 8);
             txData[5] = (byte)(fileNo & 0x00FF);
