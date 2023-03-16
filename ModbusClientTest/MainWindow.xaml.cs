@@ -191,7 +191,7 @@ namespace VVG.Modbus.ClientTest
                 if (readRecs.Length == thisLen)
                 {
                     Array.Copy(readRecs, 0, readFile, i, thisLen);
-                    len -= thisLen;
+                    i += thisLen;
                     recNum += (UInt16)(thisLen / 2);    // Records are multiples of UInt16
                     retries = 0;
                 }
