@@ -162,36 +162,37 @@ namespace VVG.Modbus.ClientTest
                 }
             }
 
-            var readFile = new byte[len * 2];
-            int startingRecNum = recNum;
-            int totalRecs = len;
+            var readFile = new byte[len];
             int retries = 0;
             
-            while (len > 0)
+            for (int i = 0; i < len; i++)
             {
-                UpdateProgress(100 * (totalRecs - len) / totalRecs);
+                UpdateProgress(100 * i / len);
+                int remaining = len - i;
 
                 // Limit to 128 bytes per request
-                UInt16 thisNumRecs = (len > 128) ? (UInt16)128 : len;
+                UInt16 thisLen = (UInt16)((remaining > 128) ? 128 : remaining);
+
                 byte[] readRecs;
                 try
                 {
-                    readRecs = await _slave.ReadFileRecord(fileNum, recNum, thisNumRecs);
+                    readRecs = await _slave.ReadFileRecord(fileNum, recNum, thisLen);
                 }
                 catch (Exception ex)
                 {
                     if (++retries > 5)
                     {
-                        MessageBox.Show(String.Format("Failed to read file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}",(totalRecs - len), totalRecs, ex), "Fail");
+                        MessageBox.Show(String.Format("Failed to read file.\n\nProgress {0}/{1} bytes.\n\nLast exception: {2}", i, len, ex), "Fail");
                         return;
                     }
                     continue;
                 }
 
-                if (readRecs.Length == thisNumRecs)
+                if (readRecs.Length == thisLen)
                 {
-                    Array.Copy(readRecs, 0, readFile, (startingRecNum - recNum), thisNumRecs);
-                    len -= thisNumRecs;
+                    Array.Copy(readRecs, 0, readFile, i, thisLen);
+                    len -= thisLen;
+                    recNum += (UInt16)(thisLen / 2);    // Records are multiples of UInt16
                     retries = 0;
                 }
             }
@@ -267,7 +268,7 @@ namespace VVG.Modbus.ClientTest
                     continue;
                 }
 
-                len += (UInt16)writeRecs.Length;
+                len -= (UInt16)writeRecs.Length;
                 retries = 0;
             }
 
