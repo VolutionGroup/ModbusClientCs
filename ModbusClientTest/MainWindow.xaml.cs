@@ -15,6 +15,7 @@ using System.Windows.Shapes;
 using System.IO.Ports;
 using Microsoft.Win32;
 using System.IO;
+using log4net;
 
 namespace VVG.Modbus.ClientTest
 {
@@ -23,6 +24,7 @@ namespace VVG.Modbus.ClientTest
     /// </summary>
     public partial class MainWindow : Window
     {
+        private static readonly ILog _log = LogManager.GetLogger(typeof(MainWindow));
         private ClientSlave _slave = new ClientSlave();
         private SerialPort _port = null;
 
@@ -86,6 +88,17 @@ namespace VVG.Modbus.ClientTest
             }
         }
 
+        private void UpdateConnected(bool connected)
+        {
+            lblStatus.Content = connected ? "Connected" : "Disconnected";
+            cmdDisconnect.IsEnabled = connected;
+            cmdConnect.IsEnabled = !connected;
+            tabs.IsEnabled = connected;
+            txtBaudRate.IsEnabled = !connected;
+            cboParity.IsEnabled = !connected;
+            txtSlaveID.IsEnabled = !connected;
+        }
+
         private void cmdConnect_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -98,10 +111,8 @@ namespace VVG.Modbus.ClientTest
                 _port.Open();
                 _slave.Client = new ClientRTU(_port);
 
-                lblStatus.Content = "Connected";
-                cmdDisconnect.IsEnabled = true;
-                cmdConnect.IsEnabled = false;
-                tabs.IsEnabled = true;
+                _log.InfoFormat("Connected to {0} @ {1}/{2}", cboSerialPort.SelectedItem, txtBaudRate.Text, cboParity.SelectedItem);
+                UpdateConnected(true);
             }
             catch (Exception ex)
             {
@@ -115,10 +126,8 @@ namespace VVG.Modbus.ClientTest
             _port = null;
             _slave.Client = null;
 
-            lblStatus.Content = "Disconnected";
-            cmdConnect.IsEnabled = true;
-            cmdDisconnect.IsEnabled = false;
-            tabs.IsEnabled = false;
+            _log.Info("COM port disconnected");
+            UpdateConnected(false);
         }
 
         private void cmdBrowseFile_Click(object sender, RoutedEventArgs e)
@@ -162,6 +171,8 @@ namespace VVG.Modbus.ClientTest
                 }
             }
 
+            _log.InfoFormat("Beginning File {0} read from record {1}, of {2} bytes", fileNum, recNum, len);
+
             var readFile = new byte[len];
             int retries = 0;
             
@@ -180,9 +191,10 @@ namespace VVG.Modbus.ClientTest
                 }
                 catch (Exception ex)
                 {
+                    _log.ErrorFormat("Read request failed at {0}/{1} (attempt {2}) - exception {3}", i, len, retries, ex);
                     if (++retries > 5)
                     {
-                        MessageBox.Show(String.Format("Failed to read file.\n\nProgress {0}/{1} bytes.\n\nLast exception: {2}", i, len, ex), "Fail");
+                        MessageBox.Show(String.Format("Failed to read file (retries exhausted).\n\nProgress {0}/{1} bytes.\n\nLast exception: {2}", i, len, ex), "Fail");
                         return;
                     }
                     continue;
@@ -196,6 +208,8 @@ namespace VVG.Modbus.ClientTest
                     retries = 0;
                 }
             }
+
+            _log.Info("File read complete");
             
             try
             {
@@ -204,6 +218,7 @@ namespace VVG.Modbus.ClientTest
             }
             catch (Exception ex)
             {
+                _log.Error("Failed to write to file", ex);
                 MessageBox.Show("Modbus transfer successful but failed to write file locally: " + ex, "Fail");
             }
         }
@@ -244,6 +259,8 @@ namespace VVG.Modbus.ClientTest
                 len = (UInt16)fileBytes.Length;
             }
 
+            _log.InfoFormat("Beginning File {0} write from record {1}, of {2} bytes", fileNum, recNum, len);
+
             int retries = 0;
 
             for (int i = 0; i < len;)
@@ -261,6 +278,7 @@ namespace VVG.Modbus.ClientTest
                 }
                 catch (Exception ex)
                 {
+                    _log.ErrorFormat("Write request failed at {0}/{1} (attempt {2}) - exception {3}", i, len, retries, ex);
                     if (++retries > 5)
                     {
                         MessageBox.Show(String.Format("Failed to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}", i, len, ex), "Fail");
@@ -274,6 +292,7 @@ namespace VVG.Modbus.ClientTest
                 retries = 0;
             }
 
+            _log.Info("File sent OK");
             MessageBox.Show("File sent OK", "Success");
         }
 

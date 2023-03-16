@@ -6,69 +6,76 @@ using System.Threading.Tasks;
 using System.IO.Ports;
 using System.Threading;
 using System.Diagnostics;
+using log4net;
 
 namespace VVG.Modbus
 {
     // TODO refactor to allow for other connection mechanisms other than RTU
     public class ClientRTU
     {
+        private static readonly ILog _log = LogManager.GetLogger(typeof(ClientRTU));
+
         // N.B. Address 0001 = register 0000 (address range 0001..9999)
         const UInt16 MAX_REG_NO = 9998;
 
-        const byte READ_COILS_TX_LEN = 8;
-        const byte READ_COILS_RX_OVERHEAD = 5;
+        const byte PDU_OVERHEAD = 4;    // address(1), function(1), crc(2)
 
-        const byte READ_DI_TX_LEN = 8;
-        const byte READ_DI_RX_OVERHEAD = 5;
+        const byte READ_COILS_TX_LEN = PDU_OVERHEAD + 4;        // starting coil (2), number of coils (2)
+        const byte READ_COILS_RX_OVERHEAD = PDU_OVERHEAD + 1;   // length in bytes (1)
 
-        const byte READ_HR_TX_LEN = 8;
-        const byte READ_HR_RX_OVERHEAD = 5;
+        const byte READ_DI_TX_LEN = PDU_OVERHEAD + 4;       // starting DI (2), number of DI (2)
+        const byte READ_DI_RX_OVERHEAD = PDU_OVERHEAD + 1;  // length in bytes (1)
 
-        const byte READ_IR_TX_LEN = 8;
-        const byte READ_IR_RX_OVERHEAD = 5;
+        const byte READ_HR_TX_LEN = PDU_OVERHEAD + 4;       // starting HR (2), number of HR (2)
+        const byte READ_HR_RX_OVERHEAD = PDU_OVERHEAD + 1;  // length in bytes (1)
 
-        const byte WRITE_COIL_TX_LEN = 8;
-        const byte WRITE_COIL_RX_LEN = 8; // command echoed back
+        const byte READ_IR_TX_LEN = PDU_OVERHEAD + 4;       // starting IR (2), number of IR (2)
+        const byte READ_IR_RX_OVERHEAD = PDU_OVERHEAD + 1;  // length in bytes (1)
 
-        const byte WRITE_HR_TX_LEN = 8;
-        const byte WRITE_HR_RX_LEN = 8;   // command echoed back
+        const byte WRITE_COIL_TX_LEN = PDU_OVERHEAD + 4;    // Coil number (2), value (2)
+        const byte WRITE_COIL_RX_LEN = WRITE_COIL_TX_LEN;   // command echoed back
 
-        const byte WRITE_COILS_TX_OVERHEAD = 9;
-        const byte WRITE_COILS_RX_LEN = 8;
+        const byte WRITE_HR_TX_LEN = PDU_OVERHEAD + 4;  // Holding register number (2), value (2)
+        const byte WRITE_HR_RX_LEN = WRITE_HR_TX_LEN;   // command echoed back
 
-        const byte WRITE_HRS_TX_OVERHEAD = 9;
-        const byte WRITE_HRS_RX_LEN = 8;
+        const byte WRITE_COILS_TX_OVERHEAD = PDU_OVERHEAD + 5;  // Starting coil (2), number of coils (2), length in bytes (1)
+        const byte WRITE_COILS_RX_LEN = PDU_OVERHEAD + 4;       // Starting coil (2), number of coils (2)
 
-        const byte READ_FILE_RECORD_TX_LEN = 12;
-        const byte READ_FILE_RECORD_RX_OVERHEAD = 12;
+        const byte WRITE_HRS_TX_OVERHEAD = PDU_OVERHEAD + 5;    // Starting HR (2), number of HR (2), length in bytes (1)
+        const byte WRITE_HRS_RX_LEN = PDU_OVERHEAD + 4;         // Starting HR (2), number of HR (2)
 
-        const byte WRITE_FILE_RECORD_TX_OVERHEAD = 12;
-        const byte WRITE_FILE_RECORD_RX_OVERHEAD = 12;    // command echoed back
+        const byte READ_FILE_RECORD_SUBREC_LEN = 7; // Reference type (1), file number (2), record number (2), number of records (2)
+        const byte READ_FILE_RECORD_TX_LEN = PDU_OVERHEAD + READ_FILE_RECORD_SUBREC_LEN + 1;    // Length in bytes (1)
+        const byte READ_FILE_RECORD_RX_OVERHEAD = READ_FILE_RECORD_TX_LEN; // same structure as tx (+ read records)
+
+        const byte WRITE_FILE_RECORD_SUBREC_LEN = 7;    // Reference type (1), file number (2), record number (2), number of records (2)
+        const byte WRITE_FILE_RECORD_TX_OVERHEAD = PDU_OVERHEAD + WRITE_FILE_RECORD_SUBREC_LEN + 1; // Length in bytes (1)
+        const byte WRITE_FILE_RECORD_RX_LEN = WRITE_FILE_RECORD_TX_OVERHEAD;    // command overhead echoed back
 
         public enum ModbusCommands
         {
             // No command 0
-            MBCMD_READ_COILS = 1,
-            MBCMD_READ_DI = 2,
-            MBCMD_READ_HR = 3,
-            MBCMD_READ_IR = 4,
-            MBCMD_WRITE_COIL_SINGLE = 5,
-            MBCMD_WRITE_HR_SINGLE = 6,
-            MBCMD_READ_EXCEPTION_STATUS = 7, /// not implemented
-            MBCMD_DIAGNOSTIC = 8, /// not implemented
+            ReadCoils = 1,
+            ReadDiscreteInput = 2,
+            ReadHoldingRegisters = 3,
+            ReadInputRegisters = 4,
+            WriteCoil = 5,
+            WriteHoldingRegister = 6,
+            ReadExceptionStatus = 7, /// not implemented
+            Diagnostic = 8, /// not implemented
             // No command 9
             // No command 10
             MBCMD_GET_COM_EVT_CTR = 11, /// not implemented
             MBCMD_GET_COM_EVT_LOG = 12, /// not implemented
             // No command 13
             // No command 14
-            MBCMD_WRITE_COIL_MULTIPLE = 15,
-            MBCMD_WRITE_HR_MULTIPLE = 16,
-            MBCMD_REPORT_SLAVE_ID = 17, /// not implemented
+            WriteCoils = 15,
+            WriteHoldingRegisters = 16,
+            ReportSlaveID = 17, /// not implemented
             // No command 18
             // No command 19
-            MBCMD_READ_FILE_RECORD = 20,
-            MBCMD_WRITE_FILE_RECORD = 21,
+            ReadFileRecords = 20,
+            WriteFileRecords = 21,
             MBCMD_MASK_WRITE_REG = 22,
             MBCMD_READ_WRITE_MULTI_REG = 23,
             MBCMD_READ_FIFO_Q = 24,
@@ -78,17 +85,18 @@ namespace VVG.Modbus
 	
 	    public enum ModbusExceptions
         {
-            MBEX_ILLEGAL_FN = 1,
-            MBEX_ILLEGAL_ADDR,
-            MBEX_ILLEGAL_VALUE,
-            MBEX_SLAVE_DEV_FAIL,
-            MBEX_ACK,
-            MBEX_SLAVE_DEV_BUSY,
-            MBEX_NAK,
-            MBEX_MEM_PARITY_ERR,
+            NoException = 0,
+            IllegalFunction,
+            IllegalAddress,
+            IllegalValue,
+            SlaveDeviceFail,
+            Acknowledge,
+            SlaveDeviceBusy,
+            NegativeAcknowledge,
+            MemoryParityError,
             // No exception 9
-            MBEX_GATEWAY_UNAVAILABLE = 10,
-            MBEX_GATEWAY_TARGET_DEV_FAILED_TO_RESPOND
+            GatewayUnavailable = 10,
+            GatewayTargetUnresponsive
         }
 
         const int TIMEOUT = 500;
@@ -101,6 +109,7 @@ namespace VVG.Modbus
             _comms.DataReceived += _comms_DataReceived;
         }
 
+        #region Receive data async
         private List<byte> _rxData = new List<byte>();
         private AutoResetEvent _dataRx = new AutoResetEvent(false);
 
@@ -128,6 +137,7 @@ namespace VVG.Modbus
 
             var data = _rxData.ToArray();
             _rxData.Clear();
+            _log.InfoFormat("Received {0} bytes", data.Length);
             return data;
         }
 
@@ -136,6 +146,7 @@ namespace VVG.Modbus
             _comms.ReadExisting();
             _rxData.Clear();
         }
+        #endregion
 
         public async Task<bool> ReadCoil(byte addr, UInt16 coilNo)
         {
@@ -145,18 +156,23 @@ namespace VVG.Modbus
 
         public async Task<bool[]> ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
         {
+            // TODO - make dynamic / update maximum to reflect typical max 256 byte embedded buffers
             UInt16 maxCoilRead = (UInt16)((32 - READ_COILS_RX_OVERHEAD) * 8);
 
-            if (((coilStartNo + len) > MAX_REG_NO) || (len > maxCoilRead))
+            if ((coilStartNo + len) > MAX_REG_NO)
             {
-                throw new ArgumentException();
+                throw new ArgumentException("Illegal coilStartNo", "coilStartNo");
+            }
+            if (len > maxCoilRead)
+            {
+                throw new ArgumentException("Too many coils requested", "len");
             }
 
             CommsPurge();
 
             byte[] txData = new byte[READ_COILS_TX_LEN];
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_READ_COILS;
+            txData[1] = (byte)ModbusCommands.ReadCoils;
             txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
             txData[3] = (byte)(coilStartNo & 0x00FF);
             txData[4] = (byte)((len & 0xFF00) >> 8);
@@ -174,12 +190,13 @@ namespace VVG.Modbus
             }
             int expectedLen = READ_COILS_RX_OVERHEAD + expectedDataCount;
 
+            _log.InfoFormat("Reading {0} coils from {1}@{2}", len, coilStartNo, addr);
             var rxData = await CommsReceive(expectedLen);
 
             // Check the length and header
             if ((rxData.Length != expectedLen)
                 || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_COILS)
+                || (rxData[1] != (byte)ModbusCommands.ReadCoils)
                 || (rxData[2] != expectedDataCount))
             {
                 throw new ModbusException(rxData);
@@ -208,6 +225,7 @@ namespace VVG.Modbus
                 }
             }
 
+            _log.InfoFormat("Read {0} coils", len);
             return rxCoils;
         }
 
@@ -224,17 +242,20 @@ namespace VVG.Modbus
         {
             int maxCoilRead = (32 - READ_DI_RX_OVERHEAD) * 8;
 
-            if (((inputStartNo + len) > MAX_REG_NO)
-                || (len > maxCoilRead))
+            if ((inputStartNo + len) > MAX_REG_NO)
             {
-                throw new ArgumentException();
+                throw new ArgumentException("Discrete inputs out of range requested", "inputStartNo");
+            }
+            if (len > maxCoilRead)
+            {
+                throw new ArgumentException("Too many discrete inputs requested", "len");
             }
             
             CommsPurge();
 
             byte[] txData = new byte[READ_DI_TX_LEN];
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_READ_DI;
+            txData[1] = (byte)ModbusCommands.ReadDiscreteInput;
             txData[2] = (byte)((inputStartNo & 0xFF00) >> 8);
             txData[3] = (byte)(inputStartNo & 0x00FF);
             txData[4] = (byte)((len & 0xFF00) >> 8);
@@ -252,12 +273,13 @@ namespace VVG.Modbus
             }
             int expectedLen = READ_DI_RX_OVERHEAD + expectedDataCount;
 
+            _log.InfoFormat("Reading {0} discrete inputs from {1}@{2}", len, inputStartNo, addr);
             var rxData = await CommsReceive(expectedLen);
 
             // Check the length and header
             if ((rxData.Length != expectedLen)
                 || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_DI)
+                || (rxData[1] != (byte)ModbusCommands.ReadDiscreteInput)
                 || (rxData[2] != expectedDataCount))
             {
                 throw new ModbusException(rxData);
@@ -286,6 +308,7 @@ namespace VVG.Modbus
                 }
             }
 
+            _log.InfoFormat("Read {0} discrete inputs", len);
             return rxInputs;
         }
 
@@ -302,17 +325,20 @@ namespace VVG.Modbus
         {
             int maxRegsRead = (64 - READ_HR_RX_OVERHEAD) / 2;
 
-            if (((regStartNo + len) > MAX_REG_NO)
-                || (len > maxRegsRead))
+            if ((regStartNo + len) > MAX_REG_NO)
             {
-                throw new ArgumentException();
+                throw new ArgumentException("Illegal holiding register requested", "regStartNo");
+            }
+            if (len > maxRegsRead)
+            {
+                throw new ArgumentException("Too many holding registers requested", "len");
             }
 
             CommsPurge();
 
             byte[] txData = new byte[READ_HR_TX_LEN];
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_READ_HR;
+            txData[1] = (byte)ModbusCommands.ReadHoldingRegisters;
             txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
             txData[3] = (byte)(regStartNo & 0x00FF);
             txData[4] = (byte)((len & 0xFF00) >> 8);
@@ -322,6 +348,7 @@ namespace VVG.Modbus
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
+            _log.InfoFormat("Reading {0} holding registers from {1}@{2}", len, regStartNo, addr);
             _comms.Write(txData, 0, READ_HR_TX_LEN);
 
             int expectedLen = READ_HR_RX_OVERHEAD + (len * 2);
@@ -329,7 +356,7 @@ namespace VVG.Modbus
 
             if ((rxData.Length != expectedLen)
                 || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_HR))
+                || (rxData[1] != (byte)ModbusCommands.ReadHoldingRegisters))
             {
                 throw new ModbusException(rxData);
             }
@@ -348,6 +375,7 @@ namespace VVG.Modbus
                 rxRegs[i] = reg;
             }
 
+            _log.InfoFormat("Read {0} holding registers", len);
             return rxRegs;
         }
 
@@ -374,7 +402,7 @@ namespace VVG.Modbus
 
             byte[] txData = new byte[READ_IR_TX_LEN];
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_READ_IR;
+            txData[1] = (byte)ModbusCommands.ReadInputRegisters;
             txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
             txData[3] = (byte)(regStartNo & 0x00FF);
             txData[4] = (byte)((len & 0xFF00) >> 8);
@@ -387,11 +415,13 @@ namespace VVG.Modbus
             _comms.Write(txData, 0, READ_IR_TX_LEN);
 
             int expectedLen = READ_IR_RX_OVERHEAD + (len * 2);
+
+            _log.InfoFormat("Reading {0} input registers from {1}@{2}", len, regStartNo, addr);
             var rxData = await CommsReceive(expectedLen);
 
             if ((rxData.Length != expectedLen)
                 || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_IR))
+                || (rxData[1] != (byte)ModbusCommands.ReadInputRegisters))
             {
                 throw new ModbusException(rxData);
             }
@@ -410,6 +440,7 @@ namespace VVG.Modbus
                 rxRegs[i] = reg;
             }
 
+            _log.InfoFormat("Read {0} input registers", len);
             return rxRegs;
         }
 
@@ -427,7 +458,7 @@ namespace VVG.Modbus
 
             byte[] txData = new byte[WRITE_COIL_TX_LEN];
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_COIL_SINGLE;
+            txData[1] = (byte)ModbusCommands.WriteCoil;
             txData[2] = (byte)((coilNo & 0xFF00) >> 8);
             txData[3] = (byte)(coilNo & 0x00FF);
             txData[4] = (byte)(txCoil ? 0xff : 0x00);
@@ -436,6 +467,8 @@ namespace VVG.Modbus
             UInt16 crc = Crc16(txData, 6);
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
+
+            _log.InfoFormat("Writing coil to {0}@{1}", coilNo, addr);
             _comms.Write(txData, 0, WRITE_COIL_TX_LEN);
 
             var rxData = await CommsReceive(WRITE_COIL_RX_LEN);
@@ -456,6 +489,7 @@ namespace VVG.Modbus
             }
 
             // All data matched - success!
+            _log.Info("Coil write OK");
         }
 
         /**
@@ -472,7 +506,7 @@ namespace VVG.Modbus
 
             byte[] txData = new byte[WRITE_HR_TX_LEN];
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_HR_SINGLE;
+            txData[1] = (byte)ModbusCommands.WriteHoldingRegister;
             txData[2] = (byte)((regNo & 0xFF00) >> 8);
             txData[3] = (byte)(regNo & 0x00FF);
             txData[4] = (byte)((txReg & 0xFF00) >> 8);
@@ -483,6 +517,7 @@ namespace VVG.Modbus
             txData[7] = (byte)((crc & 0xFF00) >> 8);
             _comms.Write(txData, 0, WRITE_HR_TX_LEN);
 
+            _log.InfoFormat("Writing holiding register to {0}@{1}", regNo, addr);
             var rxData = await CommsReceive(WRITE_HR_RX_LEN);
 
             if (rxData.Length != WRITE_HR_RX_LEN)
@@ -501,6 +536,7 @@ namespace VVG.Modbus
             }
 
             // All data matched - success!
+            _log.Info("Holding register write OK");
         }
 
         /**
@@ -521,7 +557,7 @@ namespace VVG.Modbus
 
             // Prepare the header
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_COIL_MULTIPLE;
+            txData[1] = (byte)ModbusCommands.WriteCoils;
             txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
             txData[3] = (byte)(coilStartNo & 0x00FF);
             txData[4] = (byte)((txCoils.Length & 0xFF00) >> 8);
@@ -558,6 +594,8 @@ namespace VVG.Modbus
             UInt16 crc = Crc16(txData, txLen);
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
+
+            _log.InfoFormat("Writing {0} coils from {1}@{2}", txCoils.Length, coilStartNo, addr);
             _comms.Write(txData, 0, txLen);
 
             var rxData = await CommsReceive(WRITE_COILS_RX_LEN);
@@ -583,6 +621,8 @@ namespace VVG.Modbus
             {
                 throw new ModbusException("CRC fail");
             }
+
+            _log.Info("Coils written OK");
         }
 
         /**
@@ -605,7 +645,7 @@ namespace VVG.Modbus
 
             // Prepare the header
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_HR_MULTIPLE;
+            txData[1] = (byte)ModbusCommands.WriteHoldingRegisters;
             txData[2] = (byte)((regStartNo & 0xFF00) >> 8);
             txData[3] = (byte)(regStartNo & 0x00FF);
             txData[4] = (byte)((txRegs.Length & 0xFF00) >> 8);
@@ -623,6 +663,8 @@ namespace VVG.Modbus
             UInt16 crc = Crc16(txData, txLen);
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
+
+            _log.InfoFormat("Writing {0} holiding registers from {1}@{2}", txRegs.Length, regStartNo, addr);
             _comms.Write(txData, 0, txLen);
 
             var rxData = await CommsReceive(WRITE_HRS_RX_LEN);
@@ -648,6 +690,8 @@ namespace VVG.Modbus
             {
                 throw new ModbusException("CRC failure");
             }
+
+            _log.Info("Holding registers writen OK");
         }
 
         /**
@@ -673,8 +717,8 @@ namespace VVG.Modbus
 
             // Form the request
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_READ_FILE_RECORD;
-            txData[2] = (byte)READ_FILE_RECORD_TX_LEN - 5; // PDU length (exc addr, func, len, crc)
+            txData[1] = (byte)ModbusCommands.ReadFileRecords;
+            txData[2] = (byte)READ_FILE_RECORD_SUBREC_LEN; // Sub-record length
             txData[3] = (byte)6;  // Reference type is always 6
             txData[4] = (byte)((fileNo & 0xFF00) >> 8);
             txData[5] = (byte)(fileNo & 0x00FF);
@@ -688,6 +732,7 @@ namespace VVG.Modbus
             txData[11] = (byte)((crc & 0xFF00) >> 8);
 
             // Send the request
+            _log.InfoFormat("Writing {0} records to file number {1} from record number {2} on {3}", len / 2, fileNo, recNo, addr);
             _comms.Write(txData, 0, READ_FILE_RECORD_TX_LEN);
 
             // Get the response
@@ -695,9 +740,9 @@ namespace VVG.Modbus
             var rxData = await CommsReceive(expectedLen);
 
             // Validate the response
-            if ((rxData.Length != expectedLen)
+            if ((rxData.Length < expectedLen) // may be 1 greater if odd number
                 || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.MBCMD_READ_FILE_RECORD))
+                || (rxData[1] != (byte)ModbusCommands.ReadFileRecords))
             {
                 throw new ModbusException(rxData);
             }
@@ -713,6 +758,7 @@ namespace VVG.Modbus
             var rxRecs = new byte[len];
             Array.Copy(rxData, READ_FILE_RECORD_RX_OVERHEAD - 2, rxRecs, 0, len);
 
+            _log.InfoFormat("Read {0} bytes", len);
             return rxRecs;
         }
 
@@ -738,8 +784,8 @@ namespace VVG.Modbus
 
             // Form the request
             txData[0] = addr;
-            txData[1] = (byte)ModbusCommands.MBCMD_WRITE_FILE_RECORD;
-            txData[2] = (byte)(WRITE_FILE_RECORD_TX_OVERHEAD - 5 + txFileRecs.Length); // PDU length (exc addr, func, len, crc)
+            txData[1] = (byte)ModbusCommands.WriteFileRecords;
+            txData[2] = (byte)(WRITE_FILE_RECORD_SUBREC_LEN + txFileRecs.Length);
             txData[3] = (byte)6;  // Reference type is always 6
             txData[4] = (byte)((fileNo & 0xFF00) >> 8);
             txData[5] = (byte)(fileNo & 0x00FF);
@@ -755,6 +801,7 @@ namespace VVG.Modbus
             txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 1] = (byte)((crc & 0xFF00) >> 8);
 
             // Send the request
+            _log.InfoFormat("Writing {0} records to file number {1} from record number {2} on {3}", txFileRecs.Length / 2, fileNo, recNo, addr);
             _comms.Write(txData, 0, WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
 
             // Get the response
@@ -774,6 +821,8 @@ namespace VVG.Modbus
                     throw new ModbusException("Read-back verification failed");
                 }
             }
+
+            _log.InfoFormat("Wrote {0} bytes", txFileRecs.Length);
         }
 
         static readonly UInt16[] CRC16_TABLE = new UInt16[]
