@@ -739,7 +739,7 @@ namespace VVG.Modbus
             // Form the request
             txData[0] = addr;
             txData[1] = (byte)ModbusCommands.MBCMD_WRITE_FILE_RECORD;
-            txData[2] = (byte)(WRITE_FILE_RECORD_TX_OVERHEAD - 3 + txFileRecs.Length);
+            txData[2] = (byte)(WRITE_FILE_RECORD_TX_OVERHEAD - 5 + txFileRecs.Length); // PDU length (exc addr, func, len, crc)
             txData[3] = (byte)6;  // Reference type is always 6
             txData[4] = (byte)((fileNo & 0xFF00) >> 8);
             txData[5] = (byte)(fileNo & 0x00FF);

@@ -165,7 +165,7 @@ namespace VVG.Modbus.ClientTest
             var readFile = new byte[len];
             int retries = 0;
             
-            for (int i = 0; i < len; i++)
+            for (int i = 0; i < len;)
             {
                 UpdateProgress(100 * i / len);
                 int remaining = len - i;
@@ -244,16 +244,17 @@ namespace VVG.Modbus.ClientTest
                 len = (UInt16)fileBytes.Length;
             }
 
-            int totalLen = len;
             int retries = 0;
 
-            while (len > 0)
+            for (int i = 0; i < len;)
             {
-                UpdateProgress(100 * (totalLen - len) / totalLen);
+                UpdateProgress(100 * i / len);
+
+                int remaining = (len - i);
 
                 // Limit to 128 bytes per request
-                var writeRecs = new byte[(len > 128) ? 128 : len];
-                Array.Copy(fileBytes, (totalLen - len), writeRecs, 0, writeRecs.Length);
+                var writeRecs = new byte[(remaining > 128) ? 128 : remaining];
+                Array.Copy(fileBytes, i, writeRecs, 0, writeRecs.Length);
                 try
                 {
                     await _slave.WriteFileRecord(fileNum, recNum, writeRecs);
@@ -262,13 +263,14 @@ namespace VVG.Modbus.ClientTest
                 {
                     if (++retries > 5)
                     {
-                        MessageBox.Show(String.Format("Failed to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}", (totalLen - len), totalLen, ex), "Fail");
+                        MessageBox.Show(String.Format("Failed to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}", i, len, ex), "Fail");
                         return;
                     }
                     continue;
                 }
 
-                len -= (UInt16)writeRecs.Length;
+                i += (UInt16)writeRecs.Length;
+                recNum += (UInt16)(writeRecs.Length / 2);
                 retries = 0;
             }
 
