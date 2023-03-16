@@ -45,7 +45,7 @@ namespace VVG.Modbus
         const byte WRITE_FILE_RECORD_TX_OVERHEAD = 12;
         const byte WRITE_FILE_RECORD_RX_OVERHEAD = 12;    // command echoed back
 
-        enum ModbusCommands
+        public enum ModbusCommands
         {
             // No command 0
             MBCMD_READ_COILS = 1,
@@ -76,7 +76,7 @@ namespace VVG.Modbus
             MBCMD_READ_DEV_ID = 43
         }
 	
-	    enum ModbusExceptions
+	    public enum ModbusExceptions
         {
             MBEX_ILLEGAL_FN = 1,
             MBEX_ILLEGAL_ADDR,
@@ -812,7 +812,7 @@ namespace VVG.Modbus
             (UInt16)0x8201, (UInt16)0x42C0, (UInt16)0x4380, (UInt16)0x8341, (UInt16)0x4100, (UInt16)0x81C1, (UInt16)0x8081, (UInt16)0x4040
         };
 
-        static UInt16 Crc16(byte[] data, int len)
+        static public UInt16 Crc16(byte[] data, int len)
         {
             byte temp;
             UInt16 crc = 0xFFFF;

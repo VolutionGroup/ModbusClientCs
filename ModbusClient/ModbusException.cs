@@ -39,9 +39,23 @@ namespace VVG.Modbus
             {
                 _message = "Timed out - no bytes received";
             }
+            else if (len == 5)
+            {
+                UInt16 crc = ClientRTU.Crc16(buffer, 3);
+                if (((crc & 0x00FF) != buffer[3])
+                    || (((crc & 0xFF00) >> 8) != buffer[4]))
+                {
+                    _message = "Corrupt modbus exception (5 bytes, invalid CRC)";
+                }
+                else
+                {
+                    _message = String.Format("Modbus Exception from {0} - fn:{1} code:{2}",
+                        buffer[0], (ClientRTU.ModbusCommands)(buffer[1] & 0x7F), buffer[3]);
+                }
+            }
             else
             {
-                _message = String.Format("TODO - decode {0} bytes rx as exception", len);
+                _message = String.Format("Unknown response of {0} bytes rx", len);
             }
         }
 
