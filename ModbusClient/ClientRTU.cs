@@ -151,10 +151,10 @@ namespace VVG.Modbus
         public async Task<bool> ReadCoil(byte addr, UInt16 coilNo)
         {
             var coils = await ReadCoils(addr, coilNo, 1);
-            return coils[0];
+            return coils.First();
         }
 
-        public async Task<bool[]> ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
+        public async Task<IEnumerable<bool>> ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
         {
             // TODO - make dynamic / update maximum to reflect typical max 256 byte embedded buffers
             UInt16 maxCoilRead = (UInt16)((32 - READ_COILS_RX_OVERHEAD) * 8);
@@ -213,11 +213,11 @@ namespace VVG.Modbus
             // Populate the return buffer
             byte bufferIdx = 3;
             byte bitPos = 0;
-            bool[] rxCoils = new bool[len];
+            var coils = new List<bool>();
             for (UInt16 i = 0; i < len; i++)
             {
                 byte bitMask = (byte)(1 << bitPos);
-                rxCoils[i] = (rxData[bufferIdx] & bitMask) != 0;
+                coils.Add((rxData[bufferIdx] & bitMask) != 0);
                 if (++bitPos >= 8)
                 {
                     bitPos = 0;
@@ -226,19 +226,19 @@ namespace VVG.Modbus
             }
 
             _log.InfoFormat("Read {0} coils", len);
-            return rxCoils;
+            return coils;
         }
 
         public async Task<bool> ReadDiscreteInput(byte addr, UInt16 inputNo)
         {
             var di = await ReadDiscreteInputs(addr, inputNo, 1);
-            return di[0];
+            return di.First();
         }
 
         /**
          *	Command 2 - Read Discrete Inputs
          */
-        public async Task<bool[]> ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
+        public async Task<IEnumerable<bool>> ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
         {
             int maxCoilRead = (32 - READ_DI_RX_OVERHEAD) * 8;
 
@@ -296,11 +296,11 @@ namespace VVG.Modbus
             // Populate the return buffer
             byte bufferIdx = 3;
             byte bitPos = 0;
-            bool[] rxInputs = new bool[len];
+            var values = new List<bool>();
             for (UInt16 i = 0; i < len; i++)
             {
                 byte bitMask = (byte)(1 << bitPos);
-                rxInputs[i] = (rxData[bufferIdx] & bitMask) != 0;
+                values.Add((rxData[bufferIdx] & bitMask) != 0);
                 if (++bitPos >= 8)
                 {
                     bitPos = 0;
@@ -309,19 +309,19 @@ namespace VVG.Modbus
             }
 
             _log.InfoFormat("Read {0} discrete inputs", len);
-            return rxInputs;
+            return values;
         }
 
-        public async Task<UInt16> ReadHoldingReg(byte addr, UInt16 regNo)
+        public async Task<UInt16> ReadHoldingRegister(byte addr, UInt16 regNo)
         {
-            var hr = await ReadHoldingRegs(addr, regNo, 1);
-            return hr[0];
+            var hr = await ReadHoldingRegisters(addr, regNo, 1);
+            return hr.First();
         }
 
         /**
          *	Command 3 - Read Holding Registers
          */
-        public async Task<UInt16[]> ReadHoldingRegs(byte addr, UInt16 regStartNo, UInt16 len)
+        public async Task<IEnumerable<UInt16>> ReadHoldingRegisters(byte addr, UInt16 regStartNo, UInt16 len)
         {
             int maxRegsRead = (64 - READ_HR_RX_OVERHEAD) / 2;
 
@@ -368,27 +368,26 @@ namespace VVG.Modbus
                 throw new ModbusException("CRC failure");
             }
 
-            UInt16[] rxRegs = new UInt16[len];
+            var values = new List<UInt16>();
             for (UInt16 i = 0; i < len; i++)
             {
-                UInt16 reg = (UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]);
-                rxRegs[i] = reg;
+                values.Add((UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]));
             }
 
             _log.InfoFormat("Read {0} holding registers", len);
-            return rxRegs;
+            return values;
         }
 
-        public async Task<UInt16> ReadInputReg(byte addr, UInt16 regNo)
+        public async Task<UInt16> ReadInputRegister(byte addr, UInt16 regNo)
         {
-            var ir = await ReadInputRegs(addr, regNo, 1);
-            return ir[0];
+            var ir = await ReadInputRegisters(addr, regNo, 1);
+            return ir.First();
         }
 
         /**
          *	Command 4 - Read Input Registers
          */
-        public async Task<UInt16[]> ReadInputRegs(byte addr, UInt16 regStartNo, UInt16 len)
+        public async Task<IEnumerable<UInt16>> ReadInputRegisters(byte addr, UInt16 regStartNo, UInt16 len)
         {
             int maxRegsRead = (64 - READ_IR_RX_OVERHEAD) / 2;
 
@@ -433,15 +432,14 @@ namespace VVG.Modbus
                 throw new ModbusException("CRC failure");
             }
 
-            UInt16[] rxRegs = new UInt16[len];
+            var values = new List<UInt16>();
             for (UInt16 i = 0; i < len; i++)
             {
-                UInt16 reg = (UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]);
-                rxRegs[i] = reg;
+                values.Add((UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]));
             }
 
             _log.InfoFormat("Read {0} input registers", len);
-            return rxRegs;
+            return values;
         }
 
         /**
@@ -495,7 +493,7 @@ namespace VVG.Modbus
         /**
          *	Command 6 - Write Single Holding Register
          */
-        public async Task WriteHoldingReg(byte addr, UInt16 regNo, UInt16 txReg)
+        public async Task WriteHoldingRegister(byte addr, UInt16 regNo, UInt16 txReg)
         {
             if (regNo > MAX_REG_NO)
             {
@@ -628,7 +626,7 @@ namespace VVG.Modbus
         /**
          *	Command 16 - Write Holding Registers (multiple)
          */
-        public async Task WriteHoldingRegs(byte addr, UInt16 regStartNo, UInt16[] txRegs)
+        public async Task WriteHoldingRegisters(byte addr, UInt16 regStartNo, UInt16[] txRegs)
         {
             // TODO make this dynamic
             byte[] txData = new byte[64];

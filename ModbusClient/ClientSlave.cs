@@ -16,7 +16,7 @@ namespace VVG.Modbus
             return await Client.ReadCoil(Address, coilNo);
         }
 
-        public async Task<bool[]> ReadCoils(UInt16 coilStartNo, UInt16 len)
+        public async Task<IEnumerable<bool>> ReadCoils(UInt16 coilStartNo, UInt16 len)
         {
             return await Client.ReadCoils(Address, coilStartNo, len);
         }
@@ -36,39 +36,39 @@ namespace VVG.Modbus
             return await Client.ReadDiscreteInput(Address, inputNo);
         }
 
-        public async Task<bool[]> ReadDiscreteInputs(UInt16 inputStartNo, UInt16 len)
+        public async Task<IEnumerable<bool>> ReadDiscreteInputs(UInt16 inputStartNo, UInt16 len)
         {
             return await Client.ReadDiscreteInputs(Address, inputStartNo, len);
         }
 
-        public async Task<UInt16> ReadHoldingReg(UInt16 regNo)
+        public async Task<UInt16> ReadHoldingRegister(UInt16 regNo)
         {
-            return await Client.ReadHoldingReg(Address, regNo);
+            return await Client.ReadHoldingRegister(Address, regNo);
         }
 
-        public async Task<UInt16[]> ReadHoldingRegs(UInt16 regStartNo, UInt16 len)
+        public async Task<IEnumerable<UInt16>> ReadHoldingRegisters(UInt16 regStartNo, UInt16 len)
         {
-            return await Client.ReadHoldingRegs(Address, regStartNo, len);
+            return await Client.ReadHoldingRegisters(Address, regStartNo, len);
         }
 
-        public async Task WriteHoldingReg(UInt16 regNo, UInt16 txReg)
+        public async Task WriteHoldingRegister(UInt16 regNo, UInt16 txReg)
         {
-            await Client.WriteHoldingReg(Address, regNo, txReg);
+            await Client.WriteHoldingRegister(Address, regNo, txReg);
         }
 
-        public async Task WriteHoldingRegs(UInt16 startRegNo, UInt16[] txRegs)
+        public async Task WriteHoldingRegisters(UInt16 startRegNo, UInt16[] txRegs)
         {
-            await Client.WriteHoldingRegs(Address, startRegNo, txRegs);
+            await Client.WriteHoldingRegisters(Address, startRegNo, txRegs);
         }
 
-        public async Task<UInt16> ReadInputReg(UInt16 regNo)
+        public async Task<UInt16> ReadInputRegister(UInt16 regNo)
         {
-            return await Client.ReadInputReg(Address, regNo);
+            return await Client.ReadInputRegister(Address, regNo);
         }
 
-        public async Task<UInt16[]> ReadInputRegs(UInt16 regStartNo, UInt16 len)
+        public async Task<IEnumerable<UInt16>> ReadInputRegisters(UInt16 regStartNo, UInt16 len)
         {
-            return await Client.ReadInputRegs(Address, regStartNo, len);
+            return await Client.ReadInputRegisters(Address, regStartNo, len);
         }
 
         public async Task<byte[]> ReadFileRecord(UInt16 fileNo, UInt16 recNo, UInt16 len)
