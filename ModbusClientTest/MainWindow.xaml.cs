@@ -626,7 +626,7 @@ namespace VVG.Modbus.ClientTest
     class Coil
     {
         // Read-write
-        public Coil(UInt16 reg, bool val) { Register = reg; Value = Value; }
+        public Coil(UInt16 reg, bool val) { Register = reg; Value = val; }
         public UInt16 Register { get; private set; }
         public bool Value { get; set; }
     }
@@ -634,7 +634,7 @@ namespace VVG.Modbus.ClientTest
     class DiscreteInput
     {
         // Read-only
-        public DiscreteInput(UInt16 reg, bool val) { Register = reg; Value = Value; }
+        public DiscreteInput(UInt16 reg, bool val) { Register = reg; Value = val; }
         public UInt16 Register { get; private set; }
         public bool Value { get; private set; }
     }
@@ -642,7 +642,7 @@ namespace VVG.Modbus.ClientTest
     class HoldingRegister
     {
         // Read-write
-        public HoldingRegister(UInt16 reg, UInt16 val) { Register = reg; Value = Value; }
+        public HoldingRegister(UInt16 reg, UInt16 val) { Register = reg; Value = val; }
         public UInt16 Register { get; private set; }
         public UInt16 Value { get; set; }
         public Int16 S_Value { get { return (Int16)Value; } }
@@ -651,7 +651,7 @@ namespace VVG.Modbus.ClientTest
     class InputRegister
     {
         // Read-only
-        public InputRegister(UInt16 reg, UInt16 val) { Register = reg; Value = Value; }
+        public InputRegister(UInt16 reg, UInt16 val) { Register = reg; Value = val; }
         public UInt16 Register { get; private set; }
         public UInt16 Value { get; private set; }
         public Int16 S_Value { get { return (Int16)Value; } }
