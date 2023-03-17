@@ -142,7 +142,7 @@ namespace VVG.Modbus
             // ~250 bytes assumed max the embedded device will handle
             UInt16 maxCoilRead = (UInt16)((250 - READ_COILS_RX_OVERHEAD) * 8);
 
-            if ((coilStartNo + len) > MAX_REG_NO)
+            if ((coilStartNo + len) >= MAX_REG_NO)
             {
                 throw new ArgumentException("Illegal coilStartNo", "coilStartNo");
             }
@@ -226,7 +226,7 @@ namespace VVG.Modbus
             // ~250 bytes assumed max the embedded device will handle
             int maxCoilRead = (250 - READ_DI_RX_OVERHEAD) * 8;
 
-            if ((inputStartNo + len) > MAX_REG_NO)
+            if ((inputStartNo + len) >= MAX_REG_NO)
             {
                 throw new ArgumentException("Discrete inputs out of range requested", "inputStartNo");
             }
@@ -310,7 +310,7 @@ namespace VVG.Modbus
             // ~250 bytes assumed max the embedded device will handle
             int maxRegsRead = (250 - READ_HR_RX_OVERHEAD) / 2;
 
-            if ((regStartNo + len) > MAX_REG_NO)
+            if ((regStartNo + len) >= MAX_REG_NO)
             {
                 throw new ArgumentException("Illegal holiding register requested", "regStartNo");
             }
@@ -377,7 +377,7 @@ namespace VVG.Modbus
             // ~250 bytes assumed max the embedded device will handle
             int maxRegsRead = (250 - READ_IR_RX_OVERHEAD) / 2;
 
-            if ((regStartNo > MAX_REG_NO)
+            if ((regStartNo >= MAX_REG_NO)
                 || (len > maxRegsRead))
             {
                 throw new ArgumentException();
@@ -433,7 +433,7 @@ namespace VVG.Modbus
          */
         public async Task WriteCoil(byte addr, UInt16 coilNo, bool txCoil)
         {
-            if (coilNo > MAX_REG_NO)
+            if (coilNo >= MAX_REG_NO)
             {
                 throw new ArgumentException();
             }
@@ -481,7 +481,7 @@ namespace VVG.Modbus
          */
         public async Task WriteHoldingRegister(byte addr, UInt16 regNo, UInt16 txReg)
         {
-            if (regNo > MAX_REG_NO)
+            if (regNo >= MAX_REG_NO)
             {
                 throw new ArgumentException();
             }
@@ -532,7 +532,7 @@ namespace VVG.Modbus
             byte[] txData = new byte[250];
             int maxCoilWrite = (txData.Length - WRITE_COILS_TX_OVERHEAD) * 8;
 	
-	        if (	((coilStartNo + txCoils.Length) > MAX_REG_NO)
+	        if (	((coilStartNo + txCoils.Length) >= MAX_REG_NO)
 		        ||	(txCoils.Length > maxCoilWrite) )
 	        {
                 throw new ArgumentException();
@@ -619,7 +619,7 @@ namespace VVG.Modbus
             byte[] txData = new byte[250];
             int maxRegWrite = (txData.Length - WRITE_HRS_TX_OVERHEAD) / 2;
 
-            if (((regStartNo + txRegs.Length) > MAX_REG_NO)
+            if (((regStartNo + txRegs.Length) >= MAX_REG_NO)
                 || (txRegs.Length == 0)
                 || (txRegs.Length > maxRegWrite))
             {
