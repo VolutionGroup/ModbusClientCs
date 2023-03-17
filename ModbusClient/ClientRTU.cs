@@ -10,8 +10,7 @@ using log4net;
 
 namespace VVG.Modbus
 {
-    // TODO refactor to allow for other connection mechanisms other than RTU
-    public class ClientRTU
+    public class ClientRTU : IClient
     {
         private static readonly ILog _log = LogManager.GetLogger(typeof(ClientRTU));
 

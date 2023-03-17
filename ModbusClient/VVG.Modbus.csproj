@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IClient.cs" />
     <Compile Include="ClientRTU.cs" />
     <Compile Include="ClientSlave.cs" />
     <Compile Include="ModbusException.cs" />

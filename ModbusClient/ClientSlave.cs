@@ -8,7 +8,7 @@ namespace VVG.Modbus
 {
     public class ClientSlave
     {
-        public ClientRTU Client { get; set; }
+        public IClient Client { get; set; }
         public byte Address { get; set; }
         
         public async Task<bool> ReadCoil(UInt16 coilNo)
