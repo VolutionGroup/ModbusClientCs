@@ -25,7 +25,123 @@
         <Button x:Name="cmdDisconnect" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="500,0,0,0" Width="70" Content="Disconnect" IsEnabled="False" Click="cmdDisconnect_Click" />
 
         <TabControl Grid.Row="1" IsEnabled="False" x:Name="tabs">
-            <TabItem Header="File">
+            <TabItem Header="Coils">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="1*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Label Content="Starting coil" VerticalAlignment="Center" />
+                    <TextBox x:Name="txtStartingCoil" VerticalAlignment="Center" Grid.Column="1" Text="0" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Label Content="Num of coils" VerticalAlignment="Center" Grid.Row="1" />
+                    <TextBox x:Name="txtNumCoils" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Button x:Name="cmdReadCoils" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read Coils" Margin="5,0" Click="cmdReadCoils_Click" />
+                    <Button x:Name="cmdWriteCoils" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write Coils" Margin="5,0" IsEnabled="False" />
+
+                    <DataGrid x:Name="dgCoils" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="Discrete Inputs">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="1*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Label Content="Starting DI" VerticalAlignment="Center" />
+                    <TextBox x:Name="txtStartingDI" VerticalAlignment="Center" Grid.Column="1" Text="0" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Label Content="Num of DIs" VerticalAlignment="Center" Grid.Row="1" />
+                    <TextBox x:Name="txtNumDIs" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Button x:Name="cmdReadDIs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read DIs" Margin="5,0" Click="cmdReadDIs_Click" />
+                    <Button x:Name="cmdWriteDIs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write DIs" Margin="5,0" IsEnabled="False" />
+
+                    <DataGrid x:Name="dgDiscreteInputs" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="Holding Registers">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="1*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Label Content="Starting HR" VerticalAlignment="Center" />
+                    <TextBox x:Name="txtStartingHR" VerticalAlignment="Center" Grid.Column="1" Text="0" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Label Content="Num of HRs" VerticalAlignment="Center" Grid.Row="1" />
+                    <TextBox x:Name="txtNumHRs" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Button x:Name="cmdReadHRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read HRs" Margin="5,0" Click="cmdReadHRs_Click" />
+                    <Button x:Name="cmdWriteHRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write HRs" Margin="5,0" IsEnabled="False" />
+
+                    <DataGrid x:Name="dgHoldingRegisters" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="Input Registers">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="30" />
+                        <RowDefinition Height="1*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Label Content="Starting IR" VerticalAlignment="Center" />
+                    <TextBox x:Name="txtStartingIR" VerticalAlignment="Center" Grid.Column="1" Text="0" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Label Content="Num of IRs" VerticalAlignment="Center" Grid.Row="1" />
+                    <TextBox x:Name="txtNumIRs" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
+
+                    <Button x:Name="cmdReadIRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read IRs" Margin="5,0" Click="cmdReadIRs_Click" />
+                    <Button x:Name="cmdWriteIRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write IRs" Margin="5,0" IsEnabled="False" />
+
+                    <DataGrid x:Name="dgInputRegisters" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="File Records">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="30" />
@@ -51,7 +167,7 @@
                     <Label x:Name="lblFileByteOffset" VerticalAlignment="Center" Grid.Column="2" Grid.Row="1" Content="0" />
 
                     <Label Content="Length (bytes)" VerticalAlignment="Center" Grid.Row="2" />
-                    <TextBox x:Name="txtLen" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Text="0" TextChanged="txtLen_TextChanged" />
+                    <TextBox x:Name="txtLen" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Text="0" TextChanged="UInt16ValidateTextChanged" />
 
                     <Label Content="Local filename" VerticalAlignment="Center" Grid.Row="3" />
                     <TextBox x:Name="txtFilename" VerticalAlignment="Center" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" />

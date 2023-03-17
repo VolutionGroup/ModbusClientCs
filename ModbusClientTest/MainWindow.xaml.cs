@@ -28,14 +28,25 @@ namespace VVG.Modbus.ClientTest
         private ClientSlave _slave = new ClientSlave();
         private SerialPort _port = null;
 
+        private List<Coil> _coils = new List<Coil>();
+        private List<DiscreteInput> _discreteInputs = new List<DiscreteInput>();
+        private List<HoldingRegister> _holdingRegisters = new List<HoldingRegister>();
+        private List<InputRegister> _inputRegisters = new List<InputRegister>();
+
         public MainWindow()
         {
             InitializeComponent();
 
             RefreshComPorts();
             UpdateProgress(0.0f);
+
+            UpdateCoils(null, 0);
+            UpdateDiscreteInputs(null, 0);
+            UpdateHoldingRegisters(null, 0);
+            UpdateInputRegisters(null, 0);
         }
-        
+
+        #region Update form helpers
         private void RefreshComPorts()
         {
             cboSerialPort.Items.Clear();
@@ -53,6 +64,94 @@ namespace VVG.Modbus.ClientTest
                 cboParity.Items.Add(parity);
             }
             cboParity.SelectedIndex = 0;
+        }
+
+        private void UpdateCoils(IEnumerable<bool> coils, UInt16 start)
+        {
+            _coils.Clear();
+
+            if ((coils != null) && (coils.Count() > 0))
+            {
+                int i = 0;
+                foreach (var coil in coils)
+                {
+                    _coils.Add(new Coil
+                    {
+                        Register = (UInt16)(start + i),
+                        Value = coil
+                    });
+                    i++;
+                }
+            }
+
+            dgCoils.ItemsSource = _coils;
+            dgCoils.Items.Refresh();
+        }
+
+        private void UpdateDiscreteInputs(IEnumerable<bool> discreteInputs, UInt16 start)
+        {
+            _discreteInputs.Clear();
+
+            if ((discreteInputs != null) && (discreteInputs.Count() > 0))
+            {
+                int i = 0;
+                foreach (var di in discreteInputs)
+                {
+                    _discreteInputs.Add(new DiscreteInput
+                    {
+                        Register = (UInt16)(start + i),
+                        Value = di
+                    });
+                    i++;
+                }
+            }
+
+            dgDiscreteInputs.ItemsSource = _discreteInputs;
+            dgDiscreteInputs.Items.Refresh();
+        }
+
+        private void UpdateHoldingRegisters(IEnumerable<UInt16> holdingRegisters, UInt16 start)
+        {
+            _holdingRegisters.Clear();
+
+            if ((holdingRegisters != null) && (holdingRegisters.Count() > 0))
+            {
+                int i = 0;
+                foreach (var hr in holdingRegisters)
+                {
+                    _holdingRegisters.Add(new HoldingRegister
+                    {
+                        Register = (UInt16)(start + i),
+                        Value = hr
+                    });
+                    i++;
+                }
+            }
+
+            dgHoldingRegisters.ItemsSource = _holdingRegisters;
+            dgHoldingRegisters.Items.Refresh();
+        }
+
+        private void UpdateInputRegisters(IEnumerable<UInt16> inputRegisters, UInt16 start)
+        {
+            _inputRegisters.Clear();
+
+            if ((inputRegisters != null) && (inputRegisters.Count() > 0))
+            {
+                int i = 0;
+                foreach (var ir in inputRegisters)
+                {
+                    _inputRegisters.Add(new InputRegister
+                    {
+                        Register = (UInt16)(start + i),
+                        Value = ir
+                    });
+                    i++;
+                }
+            }
+
+            dgInputRegisters.ItemsSource = _inputRegisters;
+            dgInputRegisters.Items.Refresh();
         }
 
         public void UpdateProgress(float percent)
@@ -98,6 +197,7 @@ namespace VVG.Modbus.ClientTest
             cboParity.IsEnabled = !connected;
             txtSlaveID.IsEnabled = !connected;
         }
+        #endregion
 
         private void cmdConnect_Click(object sender, RoutedEventArgs e)
         {
@@ -328,7 +428,7 @@ namespace VVG.Modbus.ClientTest
             }
         }
 
-        private void txtLen_TextChanged(object sender, TextChangedEventArgs e)
+        private void UInt16ValidateTextChanged(object sender, TextChangedEventArgs e)
         {
             var tb = (TextBox)sender;
             UInt16 len;
@@ -341,5 +441,143 @@ namespace VVG.Modbus.ClientTest
                 tb.Background = Brushes.LightSalmon;
             }
         }
+
+        private async void cmdReadCoils_Click(object sender, RoutedEventArgs e)
+        {
+            UInt16 coilStartNo, len;
+            if (false == UInt16.TryParse(txtStartingCoil.Text, out coilStartNo))
+            {
+                MessageBox.Show("Could not parse starting coil", "Fail");
+                return;
+            }
+            if (false == UInt16.TryParse(txtNumCoils.Text, out len))
+            {
+                MessageBox.Show("Could not parse number of coils", "Fail");
+                return;
+            }
+
+            IEnumerable<bool> coils;
+            try
+            {
+                coils = await _slave.ReadCoils(coilStartNo, len);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to read coils: " + ex);
+                return;
+            }
+
+            UpdateCoils(coils, coilStartNo);
+        }
+
+        private async void cmdReadDIs_Click(object sender, RoutedEventArgs e)
+        {
+            UInt16 startNo, len;
+            if (false == UInt16.TryParse(txtStartingDI.Text, out startNo))
+            {
+                MessageBox.Show("Could not parse starting DI", "Fail");
+                return;
+            }
+            if (false == UInt16.TryParse(txtNumDIs.Text, out len))
+            {
+                MessageBox.Show("Could not parse number of DIs", "Fail");
+                return;
+            }
+
+            IEnumerable<bool> values;
+            try
+            {
+                values = await _slave.ReadDiscreteInputs(startNo, len);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to read discrete inputs: " + ex);
+                return;
+            }
+
+            UpdateDiscreteInputs(values, startNo);
+        }
+
+        private async void cmdReadHRs_Click(object sender, RoutedEventArgs e)
+        {
+            UInt16 startNo, len;
+            if (false == UInt16.TryParse(txtStartingHR.Text, out startNo))
+            {
+                MessageBox.Show("Could not parse starting HR", "Fail");
+                return;
+            }
+            if (false == UInt16.TryParse(txtNumHRs.Text, out len))
+            {
+                MessageBox.Show("Could not parse number of HRs", "Fail");
+                return;
+            }
+
+            IEnumerable<UInt16> values;
+            try
+            {
+                values = await _slave.ReadHoldingRegisters(startNo, len);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to read holding registers: " + ex);
+                return;
+            }
+
+            UpdateHoldingRegisters(values, startNo);
+        }
+
+        private async void cmdReadIRs_Click(object sender, RoutedEventArgs e)
+        {
+            UInt16 startNo, len;
+            if (false == UInt16.TryParse(txtStartingIR.Text, out startNo))
+            {
+                MessageBox.Show("Could not parse starting IR", "Fail");
+                return;
+            }
+            if (false == UInt16.TryParse(txtNumIRs.Text, out len))
+            {
+                MessageBox.Show("Could not parse number of IRs", "Fail");
+                return;
+            }
+
+            IEnumerable<UInt16> values;
+            try
+            {
+                values = await _slave.ReadInputRegisters(startNo, len);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to read input registers: " + ex);
+                return;
+            }
+
+            UpdateInputRegisters(values, startNo);
+        }
     }
+
+    #region Holding classes for presentation in DataGrid
+    class Coil
+    {
+        public UInt16 Register { get; set; }
+        public bool Value { get; set; }
+    }
+
+    class DiscreteInput
+    {
+        public UInt16 Register { get; set; }
+        public bool Value { get; set; }
+    }
+
+    class HoldingRegister
+    {
+        public UInt16 Register { get; set; }
+        public UInt16 Value { get; set; }
+    }
+
+    class InputRegister
+    {
+        public UInt16 Register { get; set; }
+        public UInt16 Value { get; set; }
+    }
+    #endregion
 }
