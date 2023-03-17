@@ -9,6 +9,22 @@ namespace VVG.Modbus
     [Serializable]
     public class ModbusException : Exception
     {
+        public enum ModbusExceptions
+        {
+            NoException = 0,
+            IllegalFunction,
+            IllegalAddress,
+            IllegalValue,
+            SlaveDeviceFail,
+            Acknowledge,
+            SlaveDeviceBusy,
+            NegativeAcknowledge,
+            MemoryParityError,
+            // No exception 9
+            GatewayUnavailable = 10,
+            GatewayTargetUnresponsive
+        }
+
         private string _message;
         public override string Message
         {
@@ -49,8 +65,8 @@ namespace VVG.Modbus
                 }
                 else
                 {
-                    _message = String.Format("Modbus Exception from {0} - fn:{1} code:{2}",
-                        buffer[0], (ClientRTU.ModbusCommands)(buffer[1] & 0x7F), buffer[3]);
+                    _message = String.Format("Modbus Exception from {0} - fn: {1} code: {2}",
+                        buffer[0], (ClientRTU.ModbusCommands)(buffer[1] & 0x7F), (ModbusExceptions)buffer[2]);
                 }
             }
             else

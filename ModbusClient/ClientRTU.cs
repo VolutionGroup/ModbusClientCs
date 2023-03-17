@@ -83,22 +83,6 @@ namespace VVG.Modbus
             MBCMD_READ_DEV_ID = 43
         }
 	
-	    public enum ModbusExceptions
-        {
-            NoException = 0,
-            IllegalFunction,
-            IllegalAddress,
-            IllegalValue,
-            SlaveDeviceFail,
-            Acknowledge,
-            SlaveDeviceBusy,
-            NegativeAcknowledge,
-            MemoryParityError,
-            // No exception 9
-            GatewayUnavailable = 10,
-            GatewayTargetUnresponsive
-        }
-
         const int TIMEOUT = 500;
 
         readonly SerialPort _comms;
