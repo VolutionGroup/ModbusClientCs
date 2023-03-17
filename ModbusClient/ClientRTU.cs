@@ -156,8 +156,8 @@ namespace VVG.Modbus
 
         public async Task<IEnumerable<bool>> ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
         {
-            // TODO - make dynamic / update maximum to reflect typical max 256 byte embedded buffers
-            UInt16 maxCoilRead = (UInt16)((32 - READ_COILS_RX_OVERHEAD) * 8);
+            // ~250 bytes assumed max the embedded device will handle
+            UInt16 maxCoilRead = (UInt16)((250 - READ_COILS_RX_OVERHEAD) * 8);
 
             if ((coilStartNo + len) > MAX_REG_NO)
             {
@@ -240,7 +240,8 @@ namespace VVG.Modbus
          */
         public async Task<IEnumerable<bool>> ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
         {
-            int maxCoilRead = (32 - READ_DI_RX_OVERHEAD) * 8;
+            // ~250 bytes assumed max the embedded device will handle
+            int maxCoilRead = (250 - READ_DI_RX_OVERHEAD) * 8;
 
             if ((inputStartNo + len) > MAX_REG_NO)
             {
@@ -323,7 +324,8 @@ namespace VVG.Modbus
          */
         public async Task<IEnumerable<UInt16>> ReadHoldingRegisters(byte addr, UInt16 regStartNo, UInt16 len)
         {
-            int maxRegsRead = (64 - READ_HR_RX_OVERHEAD) / 2;
+            // ~250 bytes assumed max the embedded device will handle
+            int maxRegsRead = (250 - READ_HR_RX_OVERHEAD) / 2;
 
             if ((regStartNo + len) > MAX_REG_NO)
             {
@@ -389,7 +391,8 @@ namespace VVG.Modbus
          */
         public async Task<IEnumerable<UInt16>> ReadInputRegisters(byte addr, UInt16 regStartNo, UInt16 len)
         {
-            int maxRegsRead = (64 - READ_IR_RX_OVERHEAD) / 2;
+            // ~250 bytes assumed max the embedded device will handle
+            int maxRegsRead = (250 - READ_IR_RX_OVERHEAD) / 2;
 
             if ((regStartNo > MAX_REG_NO)
                 || (len > maxRegsRead))
@@ -542,7 +545,8 @@ namespace VVG.Modbus
          */
         public async Task WriteCoils(byte addr, UInt16 coilStartNo, bool[] txCoils)
         {
-            byte[] txData = new byte[32];
+            // TODO - make dynamic
+            byte[] txData = new byte[250];
             int maxCoilWrite = (txData.Length - WRITE_COILS_TX_OVERHEAD) * 8;
 	
 	        if (	((coilStartNo + txCoils.Length) > MAX_REG_NO)
@@ -629,7 +633,7 @@ namespace VVG.Modbus
         public async Task WriteHoldingRegisters(byte addr, UInt16 regStartNo, UInt16[] txRegs)
         {
             // TODO make this dynamic
-            byte[] txData = new byte[64];
+            byte[] txData = new byte[250];
             int maxRegWrite = (txData.Length - WRITE_HRS_TX_OVERHEAD) / 2;
 
             if (((regStartNo + txRegs.Length) > MAX_REG_NO)
