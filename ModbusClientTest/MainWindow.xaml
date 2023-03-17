@@ -5,7 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:VVG.Modbus.ClientTest"
         mc:Ignorable="d"
-        Title="VVG.Modbus.Client Test" Height="350" Width="600">
+        Title="VVG.Modbus.Client Test" 
+        Height="350" Width="600"
+        Loaded="Window_Loaded">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
@@ -47,8 +49,9 @@
                     <Label Content="Num of coils" VerticalAlignment="Center" Grid.Row="1" />
                     <TextBox x:Name="txtNumCoils" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
 
+                    <Button x:Name="cmdUpdateCoilsDG" VerticalAlignment="Center" Grid.Row="2" Content="Update DataGrid" ToolTip="Update DataGrid to match the starting register and number above" Click="cmdUpdateCoilsDG_Click" />
                     <Button x:Name="cmdReadCoils" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read Coils" Margin="5,0" Click="cmdReadCoils_Click" />
-                    <Button x:Name="cmdWriteCoils" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write Coils" Margin="5,0" IsEnabled="False" />
+                    <Button x:Name="cmdWriteCoils" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write Coils" Margin="5,0" Click="cmdWriteCoils_Click" />
 
                     <DataGrid x:Name="dgCoils" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
                 </Grid>
@@ -75,9 +78,7 @@
 
                     <Label Content="Num of DIs" VerticalAlignment="Center" Grid.Row="1" />
                     <TextBox x:Name="txtNumDIs" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
-
                     <Button x:Name="cmdReadDIs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read DIs" Margin="5,0" Click="cmdReadDIs_Click" />
-                    <Button x:Name="cmdWriteDIs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write DIs" Margin="5,0" IsEnabled="False" />
 
                     <DataGrid x:Name="dgDiscreteInputs" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
                 </Grid>
@@ -105,8 +106,9 @@
                     <Label Content="Num of HRs" VerticalAlignment="Center" Grid.Row="1" />
                     <TextBox x:Name="txtNumHRs" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
 
+                    <Button x:Name="cmdUpdateHRs" VerticalAlignment="Center" Grid.Row="2" Content="Update DataGrid" Margin="5,0" Click="cmdUpdateHRs_Click" />
                     <Button x:Name="cmdReadHRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read HRs" Margin="5,0" Click="cmdReadHRs_Click" />
-                    <Button x:Name="cmdWriteHRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write HRs" Margin="5,0" IsEnabled="False" />
+                    <Button x:Name="cmdWriteHRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write HRs" Margin="5,0" Click="cmdWriteHRs_Click" />
 
                     <DataGrid x:Name="dgHoldingRegisters" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
                 </Grid>
@@ -133,9 +135,8 @@
 
                     <Label Content="Num of IRs" VerticalAlignment="Center" Grid.Row="1" />
                     <TextBox x:Name="txtNumIRs" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="1" Margin="5,0" TextChanged="UInt16ValidateTextChanged" />
-
+                    
                     <Button x:Name="cmdReadIRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read IRs" Margin="5,0" Click="cmdReadIRs_Click" />
-                    <Button x:Name="cmdWriteIRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write IRs" Margin="5,0" IsEnabled="False" />
 
                     <DataGrid x:Name="dgInputRegisters" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
                 </Grid>

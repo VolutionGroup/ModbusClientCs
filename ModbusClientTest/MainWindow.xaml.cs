@@ -36,7 +36,10 @@ namespace VVG.Modbus.ClientTest
         public MainWindow()
         {
             InitializeComponent();
+        }
 
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
             RefreshComPorts();
             UpdateProgress(0.0f);
 
@@ -44,6 +47,8 @@ namespace VVG.Modbus.ClientTest
             UpdateDiscreteInputs(null, 0);
             UpdateHoldingRegisters(null, 0);
             UpdateInputRegisters(null, 0);
+
+            Title += String.Format(" - V{0}", System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
         }
 
         #region Update form helpers
@@ -75,11 +80,7 @@ namespace VVG.Modbus.ClientTest
                 int i = 0;
                 foreach (var coil in coils)
                 {
-                    _coils.Add(new Coil
-                    {
-                        Register = (UInt16)(start + i),
-                        Value = coil
-                    });
+                    _coils.Add(new Coil((UInt16)(start + i), coil));
                     i++;
                 }
             }
@@ -97,11 +98,7 @@ namespace VVG.Modbus.ClientTest
                 int i = 0;
                 foreach (var di in discreteInputs)
                 {
-                    _discreteInputs.Add(new DiscreteInput
-                    {
-                        Register = (UInt16)(start + i),
-                        Value = di
-                    });
+                    _discreteInputs.Add(new DiscreteInput((UInt16)(start + i), di));
                     i++;
                 }
             }
@@ -119,11 +116,7 @@ namespace VVG.Modbus.ClientTest
                 int i = 0;
                 foreach (var hr in holdingRegisters)
                 {
-                    _holdingRegisters.Add(new HoldingRegister
-                    {
-                        Register = (UInt16)(start + i),
-                        Value = hr
-                    });
+                    _holdingRegisters.Add(new HoldingRegister((UInt16)(start + i), hr));
                     i++;
                 }
             }
@@ -141,11 +134,7 @@ namespace VVG.Modbus.ClientTest
                 int i = 0;
                 foreach (var ir in inputRegisters)
                 {
-                    _inputRegisters.Add(new InputRegister
-                    {
-                        Register = (UInt16)(start + i),
-                        Value = ir
-                    });
+                    _inputRegisters.Add(new InputRegister((UInt16)(start + i), ir));
                     i++;
                 }
             }
@@ -216,7 +205,7 @@ namespace VVG.Modbus.ClientTest
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to open serial port: " + ex, "Connection failure");
+                MessageBox.Show("Failed to open serial port: " + ex.Message, "Connection failure");
             }
         }
 
@@ -319,7 +308,7 @@ namespace VVG.Modbus.ClientTest
             catch (Exception ex)
             {
                 _log.Error("Failed to write to file", ex);
-                MessageBox.Show("Modbus transfer successful but failed to write file locally: " + ex, "Fail");
+                MessageBox.Show("Modbus transfer successful but failed to write file locally: " + ex.Message, "Fail");
             }
         }
 
@@ -442,6 +431,24 @@ namespace VVG.Modbus.ClientTest
             }
         }
 
+        private void cmdUpdateCoilsDG_Click(object sender, RoutedEventArgs e)
+        {
+            UInt16 coilStartNo, len;
+            if (false == UInt16.TryParse(txtStartingCoil.Text, out coilStartNo))
+            {
+                MessageBox.Show("Could not parse starting coil", "Fail");
+                return;
+            }
+            if (false == UInt16.TryParse(txtNumCoils.Text, out len))
+            {
+                MessageBox.Show("Could not parse number of coils", "Fail");
+                return;
+            }
+
+            var coils = new bool[len];
+            UpdateCoils(coils, coilStartNo);
+        }
+
         private async void cmdReadCoils_Click(object sender, RoutedEventArgs e)
         {
             UInt16 coilStartNo, len;
@@ -463,13 +470,34 @@ namespace VVG.Modbus.ClientTest
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to read coils: " + ex);
+                MessageBox.Show("Failed to read coils: " + ex.Message, "Fail");
                 return;
             }
 
             UpdateCoils(coils, coilStartNo);
         }
 
+        private async void cmdWriteCoils_Click(object sender, RoutedEventArgs e)
+        {
+            var coils = new bool[_coils.Count()];
+            for (int i = 0; i < coils.Length; i++)
+            {
+                coils[i] = _coils[i].Value;
+            }
+
+            try
+            {
+                await _slave.WriteCoils(_coils.FirstOrDefault().Register, coils);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to write coils: " + ex.Message, "Fail");
+                return;
+            }
+
+            MessageBox.Show("Coils written OK", "Result");
+        }
+                
         private async void cmdReadDIs_Click(object sender, RoutedEventArgs e)
         {
             UInt16 startNo, len;
@@ -491,13 +519,31 @@ namespace VVG.Modbus.ClientTest
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to read discrete inputs: " + ex);
+                MessageBox.Show("Failed to read discrete inputs: " + ex.Message, "Fail");
                 return;
             }
 
             UpdateDiscreteInputs(values, startNo);
         }
+        
+        private void cmdUpdateHRs_Click(object sender, RoutedEventArgs e)
+        {
+            UInt16 startNo, len;
+            if (false == UInt16.TryParse(txtStartingHR.Text, out startNo))
+            {
+                MessageBox.Show("Could not parse starting HR", "Fail");
+                return;
+            }
+            if (false == UInt16.TryParse(txtNumHRs.Text, out len))
+            {
+                MessageBox.Show("Could not parse number of HRs", "Fail");
+                return;
+            }
 
+            var hrs = new UInt16[len];
+            UpdateHoldingRegisters(hrs, startNo);
+        }
+        
         private async void cmdReadHRs_Click(object sender, RoutedEventArgs e)
         {
             UInt16 startNo, len;
@@ -519,13 +565,34 @@ namespace VVG.Modbus.ClientTest
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to read holding registers: " + ex);
+                MessageBox.Show("Failed to read holding registers: " + ex.Message, "Fail");
                 return;
             }
 
             UpdateHoldingRegisters(values, startNo);
         }
 
+        private async void cmdWriteHRs_Click(object sender, RoutedEventArgs e)
+        {
+            var hrs = new UInt16[_holdingRegisters.Count()];
+            for (int i = 0; i < hrs.Length; i++)
+            {
+                hrs[i] = _holdingRegisters[i].Value;
+            }
+
+            try
+            {
+                await _slave.WriteHoldingRegisters(_holdingRegisters.FirstOrDefault().Register, hrs);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to write holding registers: " + ex.Message, "Fail");
+                return;
+            }
+
+            MessageBox.Show("Write holding registers OK", "Result");
+        }
+        
         private async void cmdReadIRs_Click(object sender, RoutedEventArgs e)
         {
             UInt16 startNo, len;
@@ -547,7 +614,7 @@ namespace VVG.Modbus.ClientTest
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to read input registers: " + ex);
+                MessageBox.Show("Failed to read input registers: " + ex.Message, "Fail");
                 return;
             }
 
@@ -558,26 +625,36 @@ namespace VVG.Modbus.ClientTest
     #region Holding classes for presentation in DataGrid
     class Coil
     {
-        public UInt16 Register { get; set; }
+        // Read-write
+        public Coil(UInt16 reg, bool val) { Register = reg; Value = Value; }
+        public UInt16 Register { get; private set; }
         public bool Value { get; set; }
     }
 
     class DiscreteInput
     {
-        public UInt16 Register { get; set; }
-        public bool Value { get; set; }
+        // Read-only
+        public DiscreteInput(UInt16 reg, bool val) { Register = reg; Value = Value; }
+        public UInt16 Register { get; private set; }
+        public bool Value { get; private set; }
     }
 
     class HoldingRegister
     {
-        public UInt16 Register { get; set; }
+        // Read-write
+        public HoldingRegister(UInt16 reg, UInt16 val) { Register = reg; Value = Value; }
+        public UInt16 Register { get; private set; }
         public UInt16 Value { get; set; }
+        public Int16 S_Value { get { return (Int16)Value; } }
     }
 
     class InputRegister
     {
-        public UInt16 Register { get; set; }
-        public UInt16 Value { get; set; }
+        // Read-only
+        public InputRegister(UInt16 reg, UInt16 val) { Register = reg; Value = Value; }
+        public UInt16 Register { get; private set; }
+        public UInt16 Value { get; private set; }
+        public Int16 S_Value { get { return (Int16)Value; } }
     }
     #endregion
 }
