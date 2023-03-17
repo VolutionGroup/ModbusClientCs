@@ -641,8 +641,8 @@ namespace VVG.Modbus
             // Populate the txCoils on to the transmit buffer
             for (UInt16 i = 0; i < txRegs.Length; i++)
             {
-                txData[6 + (i * 2)] = (byte)((txRegs[i] & 0xFF00) >> 8);
-                txData[7 + (i * 2)] = (byte)(txRegs[i] & 0x00FF);
+                txData[7 + (i * 2)] = (byte)((txRegs[i] & 0xFF00) >> 8);
+                txData[8 + (i * 2)] = (byte)(txRegs[i] & 0x00FF);
             }
 
             int txLen = WRITE_HRS_TX_OVERHEAD - 2 + (txRegs.Length * 2);
