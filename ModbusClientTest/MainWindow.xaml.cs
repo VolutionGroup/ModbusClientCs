@@ -267,7 +267,6 @@ namespace VVG.Modbus.ClientTest
             
             for (int i = 0; i < len;)
             {
-                UpdateProgress(100 * i / len);
                 int remaining = len - i;
 
                 // Limit to 128 bytes per request
@@ -296,6 +295,8 @@ namespace VVG.Modbus.ClientTest
                     recNum += (UInt16)(thisLen / 2);    // Records are multiples of UInt16
                     retries = 0;
                 }
+
+                UpdateProgress(100 * i / len);
             }
 
             _log.Info("File read complete");
@@ -645,7 +646,31 @@ namespace VVG.Modbus.ClientTest
         public HoldingRegister(UInt16 reg, UInt16 val) { Register = reg; Value = val; }
         public UInt16 Register { get; private set; }
         public UInt16 Value { get; set; }
-        public Int16 S_Value { get { return (Int16)Value; } }
+
+        public Int16 S_Value
+        {
+            get
+            {
+                return (Int16)Value;
+            }
+            set
+            {
+                Value = (UInt16)value;
+            }
+        }
+        public string H_Value
+        {
+            get
+            {
+                return Value.ToString("X4");
+            }
+            set
+            {
+                UInt16 val;
+                UInt16.TryParse(value, System.Globalization.NumberStyles.HexNumber, null, out val);
+                Value = val;
+            }
+        }
     }
 
     class InputRegister
@@ -655,6 +680,7 @@ namespace VVG.Modbus.ClientTest
         public UInt16 Register { get; private set; }
         public UInt16 Value { get; private set; }
         public Int16 S_Value { get { return (Int16)Value; } }
+        public string H_Value { get { return Value.ToString("X4"); } }
     }
     #endregion
 }
