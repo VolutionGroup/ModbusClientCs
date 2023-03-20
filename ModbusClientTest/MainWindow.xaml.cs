@@ -480,23 +480,45 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdWriteCoils_Click(object sender, RoutedEventArgs e)
         {
-            var coils = new bool[_coils.Count()];
-            for (int i = 0; i < coils.Length; i++)
+            if (_coils.Count() < 1)
             {
-                coils[i] = _coils[i].Value;
+                MessageBox.Show("No coil(s) available to write", "Error");
             }
+            else if (_coils.Count() == 1)
+            {
+                try
+                {
+                    var coil = _coils.First();
+                    await _slave.WriteCoil(coil.Register, coil.Value);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Failed to write coil: " + ex.Message, "Fail");
+                    return;
+                }
+                
+                MessageBox.Show("Coil written OK", "Result");
+            }
+            else
+            {
+                var coils = new bool[_coils.Count()];
+                for (int i = 0; i < coils.Length; i++)
+                {
+                    coils[i] = _coils[i].Value;
+                }
 
-            try
-            {
-                await _slave.WriteCoils(_coils.FirstOrDefault().Register, coils);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed to write coils: " + ex.Message, "Fail");
-                return;
-            }
+                try
+                {
+                    await _slave.WriteCoils(_coils.FirstOrDefault().Register, coils);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Failed to write coils: " + ex.Message, "Fail");
+                    return;
+                }
 
-            MessageBox.Show("Coils written OK", "Result");
+                MessageBox.Show("Coils written OK", "Result");
+            }
         }
                 
         private async void cmdReadDIs_Click(object sender, RoutedEventArgs e)
@@ -575,23 +597,45 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdWriteHRs_Click(object sender, RoutedEventArgs e)
         {
-            var hrs = new UInt16[_holdingRegisters.Count()];
-            for (int i = 0; i < hrs.Length; i++)
+            if (_holdingRegisters.Count() < 1)
             {
-                hrs[i] = _holdingRegisters[i].Value;
+                MessageBox.Show("No holding registers to write", "Error");
             }
+            else if (_holdingRegisters.Count() == 1)
+            {
+                try
+                {
+                    var hr = _holdingRegisters.First();
+                    await _slave.WriteHoldingRegister(hr.Register, hr.Value);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Failed to write holding register: " + ex.Message, "Fail");
+                    return;
+                }
 
-            try
-            {
-                await _slave.WriteHoldingRegisters(_holdingRegisters.FirstOrDefault().Register, hrs);
+                MessageBox.Show("Write holding register OK", "Result");
             }
-            catch (Exception ex)
+            else
             {
-                MessageBox.Show("Failed to write holding registers: " + ex.Message, "Fail");
-                return;
-            }
+                var hrs = new UInt16[_holdingRegisters.Count()];
+                for (int i = 0; i < hrs.Length; i++)
+                {
+                    hrs[i] = _holdingRegisters[i].Value;
+                }
 
-            MessageBox.Show("Write holding registers OK", "Result");
+                try
+                {
+                    await _slave.WriteHoldingRegisters(_holdingRegisters.FirstOrDefault().Register, hrs);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Failed to write holding registers: " + ex.Message, "Fail");
+                    return;
+                }
+
+                MessageBox.Show("Write holding registers OK", "Result");
+            }
         }
         
         private async void cmdReadIRs_Click(object sender, RoutedEventArgs e)
