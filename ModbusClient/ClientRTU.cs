@@ -82,7 +82,7 @@ namespace VVG.Modbus
             MBCMD_READ_DEV_ID = 43
         }
 	
-        const int TIMEOUT = 500;
+        public int TimeoutMs { get; set; }
 
         readonly SerialPort _comms;
         
@@ -90,6 +90,7 @@ namespace VVG.Modbus
         {
             _comms = port;
             _comms.DataReceived += _comms_DataReceived;
+            TimeoutMs = 500;
         }
 
         #region Receive data async
@@ -112,9 +113,9 @@ namespace VVG.Modbus
             var sw = new Stopwatch();
             sw.Restart();
             _dataRx.Reset();
-            while ((sw.ElapsedMilliseconds < TIMEOUT) && (_rxData.Count < count))
+            while ((sw.ElapsedMilliseconds < TimeoutMs) && (_rxData.Count < count))
             {
-                var msRemaining = (int)(TIMEOUT - sw.ElapsedMilliseconds);
+                var msRemaining = (int)(TimeoutMs - sw.ElapsedMilliseconds);
                 await Task.Run(() => _dataRx.WaitOne(msRemaining));
             }
 
