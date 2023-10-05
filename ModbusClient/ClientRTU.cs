@@ -116,6 +116,10 @@ namespace VVG.Modbus
             while ((sw.ElapsedMilliseconds < TimeoutMs) && (_rxData.Count < count))
             {
                 var msRemaining = (int)(TimeoutMs - sw.ElapsedMilliseconds);
+                if (msRemaining <= 0)    // Sanity check
+                {
+                    break;
+                }
                 await Task.Run(() => _dataRx.WaitOne(msRemaining));
             }
 
