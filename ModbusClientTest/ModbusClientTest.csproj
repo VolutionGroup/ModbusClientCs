@@ -105,7 +105,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\ModbusClient\VVG.Modbus.csproj">
+    <ProjectReference Include="..\VVG.Modbus\VVG.Modbus.csproj">
       <Project>{154ea065-31e9-4cbc-8bb2-0fad28c9abf9}</Project>
       <Name>VVG.Modbus</Name>
     </ProjectReference>

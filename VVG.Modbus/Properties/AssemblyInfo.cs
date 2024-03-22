@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Volution Ventilation Group")]
 [assembly: AssemblyProduct("VVG.ModbusClient")]
-[assembly: AssemblyCopyright("Copyright © Volution Ventilation Group 2023")]
+[assembly: AssemblyCopyright("Copyright © Volution Ventilation Group 2024")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>VVG.Modbus</id>
+    <version>1.0.0.0</version>
+    <title>VVG.ModbusClient</title>
+    <authors>Volution Ventilation Group</authors>
+    <owners>Volution Ventilation Group</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Modbus RTU client with access to coils, discrete inputs, holding registers, input registers and file records</description>
+    <summary>Modbus RTU client with access to coils, discrete inputs, holding registers, input registers and file records</summary>
+    <copyright>Copyright © Volution Ventilation Group 2024</copyright>
+    <dependencies>
+      <group targetFramework=".NETFramework4.5">
+        <dependency id="log4net" version="2.0.16" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>
