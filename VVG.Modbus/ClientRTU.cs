@@ -84,12 +84,25 @@ namespace VVG.Modbus
 	
         public int TimeoutMs { get; set; }
 
-        readonly SerialPort _comms;
-        
+        private SerialPort _comms;
+
+        public SerialPort Port
+        {
+            get
+            {
+                return _comms;
+            }
+            set
+            {
+                try { _comms.DataReceived -= _comms_DataReceived; } catch { }
+                _comms = value;
+                _comms.DataReceived += _comms_DataReceived;
+            }
+        }
+
         public ClientRTU(SerialPort port)
         {
-            _comms = port;
-            _comms.DataReceived += _comms_DataReceived;
+            Port = port;
             TimeoutMs = 500;
         }
 

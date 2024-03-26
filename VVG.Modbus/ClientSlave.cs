@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO.Ports;
 
 namespace VVG.Modbus
 {
@@ -11,6 +12,18 @@ namespace VVG.Modbus
         public IClient Client { get; set; }
         public byte Address { get; set; }
         
+        public ClientSlave()
+        {
+            // Assumed caller will initialise Client and Address via the Property accessors
+        }
+
+        public ClientSlave(SerialPort port, byte address)
+        {
+            // Instantiate as RTU
+            Client = new ClientRTU(port);
+            Address = address;
+        }
+
         public async Task<bool> ReadCoil(UInt16 coilNo)
         {
             return await Client.ReadCoil(Address, coilNo);
