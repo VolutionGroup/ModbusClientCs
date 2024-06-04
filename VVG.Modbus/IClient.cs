@@ -9,6 +9,11 @@ namespace VVG.Modbus
     public interface IClient
     {
         /// <summary>
+        /// Call to underlying layer to check connected status
+        /// </summary>
+        bool IsConnected { get; }
+
+        /// <summary>
         /// Read a single coil register
         /// </summary>
         /// <param name="addr">Address of the modbus slave</param>

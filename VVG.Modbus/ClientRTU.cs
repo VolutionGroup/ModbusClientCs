@@ -100,6 +100,14 @@ namespace VVG.Modbus
             }
         }
 
+        public bool IsConnected
+        {
+            get
+            {
+                return _comms.IsOpen;
+            }
+        }
+
         public ClientRTU(SerialPort port)
         {
             Port = port;
@@ -149,12 +157,25 @@ namespace VVG.Modbus
         }
         #endregion
 
+        /// <summary>
+        /// Read single coil
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="coilNo">Coil address</param>
+        /// <returns>Coil value read</returns>
         public async Task<bool> ReadCoil(byte addr, UInt16 coilNo)
         {
             var coils = await ReadCoils(addr, coilNo, 1);
             return coils.First();
         }
 
+        /// <summary>
+        /// Command 1 - read coils
+        /// </summary>
+        /// <param name="addr">Address of slave</param>
+        /// <param name="coilStartNo">Starting coil address</param>
+        /// <param name="len">Number of coils to read</param>
+        /// <returns>Coils read</returns>
         public async Task<IEnumerable<bool>> ReadCoils(byte addr, UInt16 coilStartNo, UInt16 len)
         {
             // ~250 bytes assumed max the embedded device will handle
@@ -230,15 +251,24 @@ namespace VVG.Modbus
             return coils;
         }
 
+        /// <summary>
+        /// Read single discrete input
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="inputNo">Discrete input address</param>
+        /// <returns>Value read</returns>
         public async Task<bool> ReadDiscreteInput(byte addr, UInt16 inputNo)
         {
             var di = await ReadDiscreteInputs(addr, inputNo, 1);
             return di.First();
         }
 
-        /**
-         *	Command 2 - Read Discrete Inputs
-         */
+        /// <summary>
+        /// Command 2 - Read Discrete Inputs
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="inputStartNo">Starting discrete input address</param>
+        /// <param name="len">Number of discrete inputs to read</param>
         public async Task<IEnumerable<bool>> ReadDiscreteInputs(byte addr, UInt16 inputStartNo, UInt16 len)
         {
             // ~250 bytes assumed max the embedded device will handle
@@ -314,15 +344,25 @@ namespace VVG.Modbus
             return values;
         }
 
+        /// <summary>
+        /// Read single holding register
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="regNo">Holding register address</param>
+        /// <returns>Register contents read</returns>
         public async Task<UInt16> ReadHoldingRegister(byte addr, UInt16 regNo)
         {
             var hr = await ReadHoldingRegisters(addr, regNo, 1);
             return hr.First();
         }
 
-        /**
-         *	Command 3 - Read Holding Registers
-         */
+        /// <summary>
+        /// Command 3 - Read Holding Registers
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="regStartNo">Starting holding register address</param>
+        /// <param name="len">Number of holding registers to read</param>
+        /// <returns>Registers read</returns>
         public async Task<IEnumerable<UInt16>> ReadHoldingRegisters(byte addr, UInt16 regStartNo, UInt16 len)
         {
             // ~250 bytes assumed max the embedded device will handle
@@ -381,15 +421,25 @@ namespace VVG.Modbus
             return values;
         }
 
+        /// <summary>
+        /// Read single input register
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="regNo">Input register address</param>
+        /// <returns>Register contents read</returns>
         public async Task<UInt16> ReadInputRegister(byte addr, UInt16 regNo)
         {
             var ir = await ReadInputRegisters(addr, regNo, 1);
             return ir.First();
         }
 
-        /**
-         *	Command 4 - Read Input Registers
-         */
+        /// <summary>
+        /// Command 4 - Read Input Registers
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="regStartNo">Starting input register address</param>
+        /// <param name="len">Number of input registers to read</param>
+        /// <returns>Registers read</returns>
         public async Task<IEnumerable<UInt16>> ReadInputRegisters(byte addr, UInt16 regStartNo, UInt16 len)
         {
             // ~250 bytes assumed max the embedded device will handle
@@ -445,9 +495,12 @@ namespace VVG.Modbus
             return values;
         }
 
-        /**
-         *	Command 5 - Write Single Coil
-         */
+        /// <summary>
+        /// Command 5 - Write Single Coil
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="coilNo">Coil address</param>
+        /// <param name="txCoil">Coil state to set</param>
         public async Task WriteCoil(byte addr, UInt16 coilNo, bool txCoil)
         {
             if (coilNo > MAX_REG_NO)
@@ -493,9 +546,12 @@ namespace VVG.Modbus
             _log.Info("Coil write OK");
         }
 
-        /**
-         *	Command 6 - Write Single Holding Register
-         */
+        /// <summary>
+        /// Command 6 - Write Single Holding Register
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="regNo">Holding register address</param>
+        /// <param name="txReg">Register value to set</param>
         public async Task WriteHoldingRegister(byte addr, UInt16 regNo, UInt16 txReg)
         {
             if (regNo > MAX_REG_NO)
@@ -540,9 +596,12 @@ namespace VVG.Modbus
             _log.Info("Holding register write OK");
         }
 
-        /**
-         *	Command 15 - Write Coils (multiple)
-         */
+        /// <summary>
+        /// Command 15 - Write Coils (multiple)
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="coilStartNo">Starting coil address</param>
+        /// <param name="txCoils">Coil values to write</param>
         public async Task WriteCoils(byte addr, UInt16 coilStartNo, bool[] txCoils)
         {
             // TODO - make dynamic
@@ -626,9 +685,12 @@ namespace VVG.Modbus
             _log.Info("Coils written OK");
         }
 
-        /**
-         *	Command 16 - Write Holding Registers (multiple)
-         */
+        /// <summary>
+        /// Command 16 - Write Holding Registers (multiple)
+        /// </summary>
+        /// <param name="addr">Slave address</param>
+        /// <param name="regStartNo">Starting holding register address</param>
+        /// <param name="txRegs">Register values to write</param>
         public async Task WriteHoldingRegisters(byte addr, UInt16 regStartNo, UInt16[] txRegs)
         {
             // TODO make this dynamic
@@ -695,15 +757,14 @@ namespace VVG.Modbus
             _log.Info("Holding registers writen OK");
         }
 
-        /**
-         *	Command 20 - Read File Record(s)
-         *
-         *	@param[in]	addr	Address of the slave
-         *	@param[in]	fileNo	File number to read from
-         *	@param[in]	recNo	Record number (uint16 offset) in the file
-         *	@param[in]	len		Length (in bytes) to read
-         *	@param[out]	txFileRecs	Records read from file
-         */
+        /// <summary>
+        /// Command 20 - Read File Record(s)
+        /// </summary>
+        /// <param name="addr">Address of the slave</param>
+        /// <param name="fileNo">File number to read from</param>
+        /// <param name="recNo">Record number(uint16 offset) in the file</param>
+        /// <param name="len">Length(in bytes) to read</param>
+        /// <returns>Records read from file</returns>
         public async Task<byte[]> ReadFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, UInt16 len)
         {
             byte[] txData = new byte[READ_FILE_RECORD_TX_LEN];
@@ -763,15 +824,13 @@ namespace VVG.Modbus
             return rxRecs;
         }
 
-        /**
-         *	Command 21 - Write File Record(s)
-         *
-         *	@param[in]	addr	Address of the slave
-         *	@param[in]	fileNo	File number to write to
-         *	@param[in]	recNo	Record number (uint16 offset) in the file
-         *	@param[in]	len		Length (in bytes) to write
-         *	@param[in]	txFileRecs	Records to write to file
-         */
+        /// <summary>
+        /// Command 21 - Write File Record(s)
+        /// </summary>
+        /// <param name="addr">Address of the slave</param>
+        /// <param name="fileNo">File number to write to</param>
+        /// <param name="recNo">Record number (uint16 offset) in the file</param>
+        /// <param name="txFileRecs">Records to write to file</param>
         public async Task WriteFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, byte[] txFileRecs)
         {
             if ((txFileRecs.Length == 0) || (txFileRecs.Length > (255 - WRITE_FILE_RECORD_TX_OVERHEAD)))
