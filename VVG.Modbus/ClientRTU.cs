@@ -43,9 +43,10 @@ namespace VVG.Modbus
         const byte WRITE_HRS_TX_OVERHEAD = PDU_OVERHEAD + 5;    // Starting HR (2), number of HR (2), length in bytes (1)
         const byte WRITE_HRS_RX_LEN = PDU_OVERHEAD + 4;         // Starting HR (2), number of HR (2)
 
-        const byte READ_FILE_RECORD_SUBREC_LEN = 7; // Reference type (1), file number (2), record number (2), number of records (2)
-        const byte READ_FILE_RECORD_TX_LEN = PDU_OVERHEAD + READ_FILE_RECORD_SUBREC_LEN + 1;    // Length in bytes (1)
-        const byte READ_FILE_RECORD_RX_OVERHEAD = READ_FILE_RECORD_TX_LEN; // same structure as tx (+ read records)
+        const byte READ_FILE_RECORD_SUBREC_REQ_LEN = 7; // Reference type (1), file number (2), record number (2), number of records (2)
+        const byte READ_FILE_RECORD_TX_LEN = PDU_OVERHEAD + READ_FILE_RECORD_SUBREC_REQ_LEN + 1;    // Length in bytes (1)
+        const byte READ_FILE_RECORD_SUBREC_RES_LEN = 2; // Response length (1), reference type (1)
+        const byte READ_FILE_RECORD_RX_OVERHEAD = PDU_OVERHEAD + READ_FILE_RECORD_SUBREC_RES_LEN;
 
         const byte WRITE_FILE_RECORD_SUBREC_LEN = 7;    // Reference type (1), file number (2), record number (2), number of records (2)
         const byte WRITE_FILE_RECORD_TX_OVERHEAD = PDU_OVERHEAD + WRITE_FILE_RECORD_SUBREC_LEN + 1; // Length in bytes (1)
@@ -780,7 +781,7 @@ namespace VVG.Modbus
             // Form the request
             txData[0] = addr;
             txData[1] = (byte)ModbusCommands.ReadFileRecords;
-            txData[2] = (byte)READ_FILE_RECORD_SUBREC_LEN; // Sub-record length
+            txData[2] = (byte)READ_FILE_RECORD_SUBREC_REQ_LEN; // Sub-record length
             txData[3] = (byte)6;  // Reference type is always 6
             txData[4] = (byte)((fileNo & 0xFF00) >> 8);
             txData[5] = (byte)(fileNo & 0x00FF);
@@ -817,6 +818,7 @@ namespace VVG.Modbus
             }
 
             // Copy the record data back to the passed buffer
+            // TODO - verify record response length and reference type
             var rxRecs = new byte[len];
             Array.Copy(rxData, READ_FILE_RECORD_RX_OVERHEAD - 2, rxRecs, 0, len);
 
