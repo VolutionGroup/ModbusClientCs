@@ -147,7 +147,7 @@ namespace VVG.Modbus
 
             var data = _rxData.ToArray();
             _rxData.Clear();
-            _log.InfoFormat("Received {0} bytes", data.Length);
+            _log.DebugFormat("Received {0} bytes", data.Length);
             return data;
         }
 
@@ -213,7 +213,7 @@ namespace VVG.Modbus
             }
             int expectedLen = READ_COILS_RX_OVERHEAD + expectedDataCount;
 
-            _log.InfoFormat("Reading {0} coils from {1}@{2}", len, coilStartNo, addr);
+            _log.DebugFormat("Reading {0} coils from {1}@{2}", len, coilStartNo, addr);
             var rxData = await CommsReceive(expectedLen);
 
             // Check the length and header
@@ -230,6 +230,7 @@ namespace VVG.Modbus
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
                 throw new ModbusException("CRC failure");
             }
 
@@ -248,7 +249,7 @@ namespace VVG.Modbus
                 }
             }
 
-            _log.InfoFormat("Read {0} coils", len);
+            _log.DebugFormat("Read {0} coils", len);
             return coils;
         }
 
@@ -306,7 +307,7 @@ namespace VVG.Modbus
             }
             int expectedLen = READ_DI_RX_OVERHEAD + expectedDataCount;
 
-            _log.InfoFormat("Reading {0} discrete inputs from {1}@{2}", len, inputStartNo, addr);
+            _log.DebugFormat("Reading {0} discrete inputs from {1}@{2}", len, inputStartNo, addr);
             var rxData = await CommsReceive(expectedLen);
 
             // Check the length and header
@@ -323,6 +324,7 @@ namespace VVG.Modbus
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
                 throw new ModbusException("CRC failure");
             }
 
@@ -341,7 +343,7 @@ namespace VVG.Modbus
                 }
             }
 
-            _log.InfoFormat("Read {0} discrete inputs", len);
+            _log.DebugFormat("Read {0} discrete inputs", len);
             return values;
         }
 
@@ -392,7 +394,7 @@ namespace VVG.Modbus
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
-            _log.InfoFormat("Reading {0} holding registers from {1}@{2}", len, regStartNo, addr);
+            _log.DebugFormat("Reading {0} holding registers from {1}@{2}", len, regStartNo, addr);
             _comms.Write(txData, 0, READ_HR_TX_LEN);
 
             int expectedLen = READ_HR_RX_OVERHEAD + (len * 2);
@@ -409,6 +411,7 @@ namespace VVG.Modbus
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
                 throw new ModbusException("CRC failure");
             }
 
@@ -418,7 +421,7 @@ namespace VVG.Modbus
                 values.Add((UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]));
             }
 
-            _log.InfoFormat("Read {0} holding registers", len);
+            _log.DebugFormat("Read {0} holding registers", len);
             return values;
         }
 
@@ -469,7 +472,7 @@ namespace VVG.Modbus
 
             int expectedLen = READ_IR_RX_OVERHEAD + (len * 2);
 
-            _log.InfoFormat("Reading {0} input registers from {1}@{2}", len, regStartNo, addr);
+            _log.DebugFormat("Reading {0} input registers from {1}@{2}", len, regStartNo, addr);
             var rxData = await CommsReceive(expectedLen);
 
             if ((rxData.Length != expectedLen)
@@ -483,6 +486,7 @@ namespace VVG.Modbus
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
                 throw new ModbusException("CRC failure");
             }
 
@@ -492,7 +496,7 @@ namespace VVG.Modbus
                 values.Add((UInt16)(((UInt16)rxData[3 + i * 2] << 8) + rxData[4 + i * 2]));
             }
 
-            _log.InfoFormat("Read {0} input registers", len);
+            _log.DebugFormat("Read {0} input registers", len);
             return values;
         }
 
@@ -523,7 +527,7 @@ namespace VVG.Modbus
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
-            _log.InfoFormat("Writing coil to {0}@{1}", coilNo, addr);
+            _log.DebugFormat("Writing coil to {0}@{1}", coilNo, addr);
             _comms.Write(txData, 0, WRITE_COIL_TX_LEN);
 
             var rxData = await CommsReceive(WRITE_COIL_RX_LEN);
@@ -539,12 +543,13 @@ namespace VVG.Modbus
                 if (txData[i] != rxData[i])
                 {
                     // Mismatch - fail :(
+                    _log.ErrorFormat("Read-back failed @ {0} - 0x{1:X2} != 0x{2:X2}", i, txData[i], rxData[i]);
                     throw new ModbusException("Failed to validate response");
                 }
             }
 
             // All data matched - success!
-            _log.Info("Coil write OK");
+            _log.Debug("Coil write OK");
         }
 
         /// <summary>
@@ -575,7 +580,7 @@ namespace VVG.Modbus
             txData[7] = (byte)((crc & 0xFF00) >> 8);
             _comms.Write(txData, 0, WRITE_HR_TX_LEN);
 
-            _log.InfoFormat("Writing holiding register to {0}@{1}", regNo, addr);
+            _log.DebugFormat("Writing holiding register to {0}@{1}", regNo, addr);
             var rxData = await CommsReceive(WRITE_HR_RX_LEN);
 
             if (rxData.Length != WRITE_HR_RX_LEN)
@@ -589,12 +594,13 @@ namespace VVG.Modbus
                 if (txData[i] != rxData[i])
                 {
                     // Mismatch - fail :(
+                    _log.ErrorFormat("Read-back failed @ {0} - 0x{1:X2} != 0x{2:X2}", i, txData[i], rxData[i]);
                     throw new ModbusException("Failed to validate response");
                 }
             }
 
             // All data matched - success!
-            _log.Info("Holding register write OK");
+            _log.Debug("Holding register write OK");
         }
 
         /// <summary>
@@ -656,7 +662,7 @@ namespace VVG.Modbus
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
 
-            _log.InfoFormat("Writing {0} coils from {1}@{2}", txCoils.Length, coilStartNo, addr);
+            _log.DebugFormat("Writing {0} coils from {1}@{2}", txCoils.Length, coilStartNo, addr);
             _comms.Write(txData, 0, txLen);
 
             var rxData = await CommsReceive(WRITE_COILS_RX_LEN);
@@ -671,6 +677,7 @@ namespace VVG.Modbus
             {
                 if (txData[i] != rxData[i])
                 {
+                    _log.ErrorFormat("Read-back failed @ {0} - 0x{1:X2} != 0x{2:X2}", i, txData[i], rxData[i]);
                     throw new ModbusException("Echo-back verification failed");
                 }
             }
@@ -680,10 +687,11 @@ namespace VVG.Modbus
             if (((crc & 0x00FF) != rxData[rxData.Length - 2])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData.Length - 1]))
             {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData.Length - 1], rxData[rxData.Length - 2]);
                 throw new ModbusException("CRC fail");
             }
 
-            _log.Info("Coils written OK");
+            _log.Debug("Coils written OK");
         }
 
         /// <summary>
@@ -728,7 +736,7 @@ namespace VVG.Modbus
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
 
-            _log.InfoFormat("Writing {0} holiding registers from {1}@{2}", txRegs.Length, regStartNo, addr);
+            _log.DebugFormat("Writing {0} holiding registers from {1}@{2}", txRegs.Length, regStartNo, addr);
             _comms.Write(txData, 0, txLen);
 
             var rxData = await CommsReceive(WRITE_HRS_RX_LEN);
@@ -743,6 +751,7 @@ namespace VVG.Modbus
             {
                 if (txData[i] != rxData[i])
                 {
+                    _log.ErrorFormat("Read-back failed @ {0} - 0x{1:X2} != 0x{2:X2}", i, txData[i], rxData[i]);
                     throw new ModbusException("Read-back failure");
                 }
             }
@@ -752,10 +761,11 @@ namespace VVG.Modbus
             if (((crc & 0x00FF) != rxData[rxData.Length - 2])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData.Length - 1]))
             {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData.Length - 1], rxData[rxData.Length - 2]);
                 throw new ModbusException("CRC failure");
             }
 
-            _log.Info("Holding registers writen OK");
+            _log.Debug("Holding registers writen OK");
         }
 
         /// <summary>
@@ -795,7 +805,7 @@ namespace VVG.Modbus
             txData[11] = (byte)((crc & 0xFF00) >> 8);
 
             // Send the request
-            _log.InfoFormat("Writing {0} records to file number {1} from record number {2} on {3}", len / 2, fileNo, recNo, addr);
+            _log.DebugFormat("Writing {0} records to file number {1} from record number {2} on {3}", len / 2, fileNo, recNo, addr);
             _comms.Write(txData, 0, READ_FILE_RECORD_TX_LEN);
 
             // Get the response
@@ -814,6 +824,7 @@ namespace VVG.Modbus
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
                 throw new ModbusException("CRC failure");
             }
 
@@ -822,7 +833,7 @@ namespace VVG.Modbus
             var rxRecs = new byte[len];
             Array.Copy(rxData, READ_FILE_RECORD_RX_OVERHEAD - 2, rxRecs, 0, len);
 
-            _log.InfoFormat("Read {0} bytes", len);
+            _log.DebugFormat("Read {0} bytes", len);
             return rxRecs;
         }
 
@@ -863,7 +874,7 @@ namespace VVG.Modbus
             txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 1] = (byte)((crc & 0xFF00) >> 8);
 
             // Send the request
-            _log.InfoFormat("Writing {0} records to file number {1} from record number {2} on {3}", txFileRecs.Length / 2, fileNo, recNo, addr);
+            _log.DebugFormat("Writing {0} records to file number {1} from record number {2} on {3}", txFileRecs.Length / 2, fileNo, recNo, addr);
             _comms.Write(txData, 0, WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
 
             // Get the response
@@ -880,11 +891,12 @@ namespace VVG.Modbus
             {
                 if (txData[i] != rxData[i])
                 {
+                    _log.ErrorFormat("Read-back failed @ {0} - 0x{1:X2} != 0x{2:X2}", i, txData[i], rxData[i]);
                     throw new ModbusException("Read-back verification failed");
                 }
             }
 
-            _log.InfoFormat("Wrote {0} bytes", txFileRecs.Length);
+            _log.DebugFormat("Wrote {0} bytes", txFileRecs.Length);
         }
 
         static readonly UInt16[] CRC16_TABLE = new UInt16[]
