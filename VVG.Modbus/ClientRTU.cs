@@ -98,9 +98,12 @@ namespace VVG.Modbus
                 // TODO - do not use DataReceived https://sparxeng.com/blog/software/must-use-net-system-io-ports-serialport
                 try { _comms.DataReceived -= comms_DataReceived; } catch { }
                 _comms = value;
-                _comms.ReadTimeout = 500;
-                _comms.WriteTimeout = 500;
-                _comms.DataReceived += comms_DataReceived;
+                if (_comms != null)
+                {
+                    _comms.ReadTimeout = 500;
+                    _comms.WriteTimeout = 500;
+                    _comms.DataReceived += comms_DataReceived;
+                }
             }
         }
 
@@ -108,6 +111,7 @@ namespace VVG.Modbus
         {
             get
             {
+                if (_comms == null) return false;
                 return _comms.IsOpen;
             }
         }
