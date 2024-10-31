@@ -171,10 +171,7 @@ namespace VVG.Modbus
 
         private void CommsPurge()
         {
-            while (_comms.BaseStream.Length > 0)
-            {
-                _comms.BaseStream.ReadByte();
-            }
+            _comms.ReadExisting();
             _rxData.Clear();
         }
         #endregion
