@@ -95,9 +95,12 @@ namespace VVG.Modbus
             }
             set
             {
-                try { _comms.DataReceived -= _comms_DataReceived; } catch { }
+                // TODO - do not use DataReceived https://sparxeng.com/blog/software/must-use-net-system-io-ports-serialport
+                try { _comms.DataReceived -= comms_DataReceived; } catch { }
                 _comms = value;
-                _comms.DataReceived += _comms_DataReceived;
+                _comms.ReadTimeout = 500;
+                _comms.WriteTimeout = 500;
+                _comms.DataReceived += comms_DataReceived;
             }
         }
 
@@ -119,7 +122,8 @@ namespace VVG.Modbus
         private List<byte> _rxData = new List<byte>();
         private AutoResetEvent _dataRx = new AutoResetEvent(false);
 
-        private void _comms_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        // TODO - do not use DataReceived https://sparxeng.com/blog/software/must-use-net-system-io-ports-serialport
+        private void comms_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             if (e.EventType == SerialData.Chars)
             {
@@ -153,7 +157,10 @@ namespace VVG.Modbus
 
         private void CommsPurge()
         {
-            _comms.ReadExisting();
+            while (_comms.BaseStream.Length > 0)
+            {
+                _comms.BaseStream.ReadByte();
+            }
             _rxData.Clear();
         }
         #endregion
