@@ -670,11 +670,6 @@ namespace VVG.Modbus
                 }
             }
 
-            // If the final byte is partially filled, add it to the length
-            if (bitPos > 0)
-            {
-                txLen++;
-            }
             txData[6] = (byte)(txLen - 6);
 
             UInt16 crc = Crc16(txData, txLen);
