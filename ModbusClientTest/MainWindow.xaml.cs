@@ -235,7 +235,8 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdReadFile_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 fileNum, recNum, len;
+            UInt16 fileNum, recNum;
+            int len;
             if (false == UInt16.TryParse(txtFileNum.Text, out fileNum))
             {
                 MessageBox.Show("Failed to parse File Number", "Fail");
@@ -246,9 +247,14 @@ namespace VVG.Modbus.ClientTest
                 MessageBox.Show("Failed to parse Record Number", "Fail");
                 return;
             }
-            if (false == UInt16.TryParse(txtLen.Text, out len))
+            if (false == int.TryParse(txtLen.Text, out len))
             {
                 MessageBox.Show("Failed to parse Length (bytes)", "Fail");
+                return;
+            }
+            if (len > UInt16.MaxValue * 2)
+            {
+                MessageBox.Show("Length exceeds maximum of " + (UInt16.MaxValue * 2) + " bytes", "Fail");
                 return;
             }
 
@@ -315,7 +321,8 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdWriteFile_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 fileNum, recNum, len;
+            UInt16 fileNum, recNum;
+            int len;
             if (false == UInt16.TryParse(txtFileNum.Text, out fileNum))
             {
                 MessageBox.Show("Failed to parse File Number", "Fail");
@@ -326,9 +333,14 @@ namespace VVG.Modbus.ClientTest
                 MessageBox.Show("Failed to parse Record Number", "Fail");
                 return;
             }
-            if (false == UInt16.TryParse(txtLen.Text, out len))
+            if (false == int.TryParse(txtLen.Text, out len))
             {
-                MessageBox.Show("Failed to parse Length", "Fail");
+                MessageBox.Show("Failed to parse Length (bytes)", "Fail");
+                return;
+            }
+            if (len > UInt16.MaxValue * 2)
+            {
+                MessageBox.Show("Length exceeds maximum of " + (UInt16.MaxValue * 2) + " bytes", "Fail");
                 return;
             }
 
@@ -423,6 +435,20 @@ namespace VVG.Modbus.ClientTest
             var tb = (TextBox)sender;
             UInt16 len;
             if (UInt16.TryParse(tb.Text, out len))
+            {
+                tb.Background = Brushes.LightGreen;
+            }
+            else
+            {
+                tb.Background = Brushes.LightSalmon;
+            }
+        }
+
+        private void UInt16x2ValidateTextChanged(object sender, TextChangedEventArgs e)
+        {
+            var tb = (TextBox)sender;
+            int len;
+            if (int.TryParse(tb.Text, out len) && (len > 0) && (len < UInt16.MaxValue * 2))
             {
                 tb.Background = Brushes.LightGreen;
             }
