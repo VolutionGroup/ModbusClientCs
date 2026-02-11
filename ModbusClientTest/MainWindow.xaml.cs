@@ -321,14 +321,18 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdWriteFile_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 fileNum, recNum;
-            int len;
+            UInt16 fileNum, ui16;
+            int len, recNum; // need to be > UInt16 now we're allowing for roll-over
             if (false == UInt16.TryParse(txtFileNum.Text, out fileNum))
             {
                 MessageBox.Show("Failed to parse File Number", "Fail");
                 return;
             }
-            if (false == UInt16.TryParse(txtRecNum.Text, out recNum))
+            if (UInt16.TryParse(txtRecNum.Text, out ui16))
+            {
+                recNum = ui16;
+            }
+            else
             {
                 MessageBox.Show("Failed to parse Record Number", "Fail");
                 return;
@@ -338,12 +342,7 @@ namespace VVG.Modbus.ClientTest
                 MessageBox.Show("Failed to parse Length (bytes)", "Fail");
                 return;
             }
-            if (len > UInt16.MaxValue * 2)
-            {
-                MessageBox.Show("Length exceeds maximum of " + (UInt16.MaxValue * 2) + " bytes", "Fail");
-                return;
-            }
-
+            
             if (false == File.Exists(txtFilename.Text))
             {
                 MessageBox.Show("File does not exist - cannot send file", "Fail");
@@ -354,11 +353,26 @@ namespace VVG.Modbus.ClientTest
             
             if (fileBytes.Length < len)
             {
-                if (MessageBox.Show("Insufficient bytes in file for requested send size - reduce to match file size?", "Size mis-match", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                if (MessageBox.Show("Insufficient bytes in file for requested send size - update to match file size?", "Size mis-match", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 {
                     return;
                 }
                 len = (UInt16)fileBytes.Length;
+                await Dispatcher.BeginInvoke(new Action(() => txtLen.Text = len.ToString()));
+            }
+            if (len > UInt16.MaxValue * 2)
+            {
+                // TODO - also take into account starting offset
+                int split = len / (UInt16.MaxValue * 2);
+                if (len % (UInt16.MaxValue * 2) > 0)
+                {
+                    split++;
+                }
+                if (MessageBox.Show(String.Format("Length exceeds maximum of {0} bytes\n\nSplit over {1} file IDs?", UInt16.MaxValue * 2, split),
+                    "That's larger than expected", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                {
+                    return;
+                }
             }
 
             _log.InfoFormat("Beginning File {0} write from record {1}, of {2} bytes", fileNum, recNum, len);
@@ -367,16 +381,22 @@ namespace VVG.Modbus.ClientTest
 
             for (int i = 0; i < len;)
             {
-                UpdateProgress(100 * i / len);
+                UpdateProgress(100.0f * i / len);
 
                 int remaining = (len - i);
 
                 // Limit to 128 bytes per request
-                var writeRecs = new byte[(remaining > 128) ? 128 : remaining];
+                int thisWriteLen = (remaining > 128) ? 128 : remaining;
+                if (recNum + (thisWriteLen / 2) > UInt16.MaxValue)
+                {
+                    thisWriteLen = (UInt16.MaxValue + 1 - recNum) * 2; // limit to max record size
+                    _log.InfoFormat("Restricting write to {0} bytes to avoid overlap to next FileID", thisWriteLen);
+                }
+                var writeRecs = new byte[thisWriteLen];
                 Array.Copy(fileBytes, i, writeRecs, 0, writeRecs.Length);
                 try
                 {
-                    await _slave.WriteFileRecord(fileNum, recNum, writeRecs);
+                    await _slave.WriteFileRecord(fileNum, (UInt16)recNum, writeRecs);
                 }
                 catch (Exception ex)
                 {
@@ -389,11 +409,19 @@ namespace VVG.Modbus.ClientTest
                     continue;
                 }
 
-                i += (UInt16)writeRecs.Length;
-                recNum += (UInt16)(writeRecs.Length / 2);
+                i += writeRecs.Length;
+                recNum += writeRecs.Length / 2;
                 retries = 0;
+
+                if (recNum > UInt16.MaxValue)
+                {
+                    _log.InfoFormat("FileID {0} length exceeded, wrapping to next", fileNum);
+                    fileNum++;
+                    recNum = 0; // wrap around
+                }
             }
 
+            UpdateProgress(100);
             _log.Info("File sent OK");
             MessageBox.Show("File sent OK", "Success");
         }
