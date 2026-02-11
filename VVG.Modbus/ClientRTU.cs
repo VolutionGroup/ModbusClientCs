@@ -46,7 +46,7 @@ namespace VVG.Modbus
         const byte READ_FILE_RECORD_SUBREC_REQ_LEN = 7; // Reference type (1), file number (2), record number (2), number of records (2)
         const byte READ_FILE_RECORD_TX_LEN = PDU_OVERHEAD + READ_FILE_RECORD_SUBREC_REQ_LEN + 1;    // Length in bytes (1)
         const byte READ_FILE_RECORD_SUBREC_RES_LEN = 2; // Response length (1), reference type (1)
-        const byte READ_FILE_RECORD_RX_OVERHEAD = PDU_OVERHEAD + READ_FILE_RECORD_SUBREC_RES_LEN;
+        const byte READ_FILE_RECORD_RX_OVERHEAD = PDU_OVERHEAD + READ_FILE_RECORD_SUBREC_RES_LEN + 1; // Response data len (1)
 
         const byte WRITE_FILE_RECORD_SUBREC_LEN = 7;    // Reference type (1), file number (2), record number (2), number of records (2)
         const byte WRITE_FILE_RECORD_TX_OVERHEAD = PDU_OVERHEAD + WRITE_FILE_RECORD_SUBREC_LEN + 1; // Length in bytes (1)

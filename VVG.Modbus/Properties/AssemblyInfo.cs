@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Resources;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -10,7 +11,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Volution Ventilation Group")]
 [assembly: AssemblyProduct("VVG.ModbusClient")]
-[assembly: AssemblyCopyright("Copyright © Volution Ventilation Group 2024")]
+[assembly: AssemblyCopyright("Copyright © Volution Ventilation Group 2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -33,4 +34,5 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyFileVersion("1.0.4.5")]
+[assembly: AssemblyFileVersion("1.0.5.0")]
+[assembly: NeutralResourcesLanguage("en-IO")]
