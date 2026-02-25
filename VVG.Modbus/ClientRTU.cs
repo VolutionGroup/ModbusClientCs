@@ -230,12 +230,16 @@ namespace VVG.Modbus
             }
             int expectedLen = READ_COILS_RX_OVERHEAD + expectedDataCount;
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _comms.Write(txData, 0, txData.Length);
-            _log.DebugFormat("Reading {0} coils from {1}@{2}", len, coilStartNo, addr);
-            var rxData = await CommsReceive(expectedLen);
-            _semaphore.Release();
+            try
+            {
+                CommsPurge();
+                _comms.Write(txData, 0, txData.Length);
+                _log.DebugFormat("Reading {0} coils from {1}@{2}", len, coilStartNo, addr);
+                rxData = await CommsReceive(expectedLen);
+            }
+            finally { _semaphore.Release(); }
 
             // Check the length and header
             if ((rxData.Length != expectedLen)
@@ -325,12 +329,16 @@ namespace VVG.Modbus
             }
             int expectedLen = READ_DI_RX_OVERHEAD + expectedDataCount;
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _comms.Write(txData, 0, READ_DI_TX_LEN);
-            _log.DebugFormat("Reading {0} discrete inputs from {1}@{2}", len, inputStartNo, addr);
-            var rxData = await CommsReceive(expectedLen);
-            _semaphore.Release();
+            try
+            {
+                CommsPurge();
+                _comms.Write(txData, 0, READ_DI_TX_LEN);
+                _log.DebugFormat("Reading {0} discrete inputs from {1}@{2}", len, inputStartNo, addr);
+                rxData = await CommsReceive(expectedLen);
+            }
+            finally { _semaphore.Release(); }
 
             // Check the length and header
             if ((rxData.Length != expectedLen)
@@ -416,12 +424,16 @@ namespace VVG.Modbus
 
             int expectedLen = READ_HR_RX_OVERHEAD + (len * 2);
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _log.DebugFormat("Reading {0} holding registers from {1}@{2}", len, regStartNo, addr);
-            _comms.Write(txData, 0, READ_HR_TX_LEN);
-            var rxData = await CommsReceive(expectedLen);
-            _semaphore.Release();
+            try
+            { 
+                CommsPurge();
+                _log.DebugFormat("Reading {0} holding registers from {1}@{2}", len, regStartNo, addr);
+                _comms.Write(txData, 0, READ_HR_TX_LEN);
+                rxData = await CommsReceive(expectedLen);
+            }
+            finally { _semaphore.Release(); }
 
             if ((rxData.Length != expectedLen)
                 || (rxData[0] != addr)
@@ -490,12 +502,16 @@ namespace VVG.Modbus
             txData[7] = (byte)((crc & 0xFF00) >> 8);
             int expectedLen = READ_IR_RX_OVERHEAD + (len * 2);
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _comms.Write(txData, 0, READ_IR_TX_LEN);
-            _log.DebugFormat("Reading {0} input registers from {1}@{2}", len, regStartNo, addr);
-            var rxData = await CommsReceive(expectedLen);
-            _semaphore.Release();
+            try
+            {
+                CommsPurge();
+                _comms.Write(txData, 0, READ_IR_TX_LEN);
+                _log.DebugFormat("Reading {0} input registers from {1}@{2}", len, regStartNo, addr);
+                rxData = await CommsReceive(expectedLen);
+            }
+            finally { _semaphore.Release(); }
 
             if ((rxData.Length != expectedLen)
                 || (rxData[0] != addr)
@@ -547,12 +563,16 @@ namespace VVG.Modbus
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _log.DebugFormat("Writing coil to {0}@{1}", coilNo, addr);
-            _comms.Write(txData, 0, WRITE_COIL_TX_LEN);
-            var rxData = await CommsReceive(WRITE_COIL_RX_LEN);
-            _semaphore.Release();
+            try
+            {
+                CommsPurge();
+                _log.DebugFormat("Writing coil to {0}@{1}", coilNo, addr);
+                _comms.Write(txData, 0, WRITE_COIL_TX_LEN);
+                rxData = await CommsReceive(WRITE_COIL_RX_LEN);
+            }
+            finally { _semaphore.Release(); }
 
             if (rxData.Length != WRITE_COIL_RX_LEN)
             {
@@ -599,12 +619,16 @@ namespace VVG.Modbus
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _comms.Write(txData, 0, WRITE_HR_TX_LEN);
-            _log.DebugFormat("Writing holiding register to {0}@{1}", regNo, addr);
-            var rxData = await CommsReceive(WRITE_HR_RX_LEN);
-            _semaphore.Release();
+            try
+            {
+                CommsPurge();
+                _comms.Write(txData, 0, WRITE_HR_TX_LEN);
+                _log.DebugFormat("Writing holiding register to {0}@{1}", regNo, addr);
+                rxData = await CommsReceive(WRITE_HR_RX_LEN);
+            }
+            finally { _semaphore.Release(); }
 
             if (rxData.Length != WRITE_HR_RX_LEN)
             {
@@ -679,12 +703,16 @@ namespace VVG.Modbus
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _log.DebugFormat("Writing {0} coils from {1}@{2}", txCoils.Length, coilStartNo, addr);
-            _comms.Write(txData, 0, txLen);
-            var rxData = await CommsReceive(WRITE_COILS_RX_LEN);
-            _semaphore.Release();
+            try
+            {
+                CommsPurge();
+                _log.DebugFormat("Writing {0} coils from {1}@{2}", txCoils.Length, coilStartNo, addr);
+                _comms.Write(txData, 0, txLen);
+                rxData = await CommsReceive(WRITE_COILS_RX_LEN);
+            }
+            finally { _semaphore.Release(); }
 
             if (rxData.Length != WRITE_COILS_RX_LEN)
             {
@@ -753,12 +781,16 @@ namespace VVG.Modbus
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
-            _log.DebugFormat("Writing {0} holiding registers from {1}@{2}", txRegs.Length, regStartNo, addr);
-            _comms.Write(txData, 0, txLen);
-            var rxData = await CommsReceive(WRITE_HRS_RX_LEN);
-            _semaphore.Release();
+            try
+            {
+                CommsPurge();
+                _log.DebugFormat("Writing {0} holiding registers from {1}@{2}", txRegs.Length, regStartNo, addr);
+                _comms.Write(txData, 0, txLen);
+                rxData = await CommsReceive(WRITE_HRS_RX_LEN);
+            }
+            finally { _semaphore.Release(); }
 
             if (rxData.Length != WRITE_HRS_RX_LEN)
             {
@@ -821,18 +853,22 @@ namespace VVG.Modbus
             txData[10] = (byte)(crc & 0x00FF);
             txData[11] = (byte)((crc & 0xFF00) >> 8);
 
-            await _semaphore.WaitAsync();
-            CommsPurge();
-
-            // Send the request
-            _log.DebugFormat("Writing {0} records to file number {1} from record number {2} on {3}", len / 2, fileNo, recNo, addr);
-            _comms.Write(txData, 0, READ_FILE_RECORD_TX_LEN);
-
-            // Get the response
             int expectedLen = (READ_FILE_RECORD_RX_OVERHEAD + len);
-            var rxData = await CommsReceive(expectedLen);
 
-            _semaphore.Release();
+            byte[] rxData = null;
+            await _semaphore.WaitAsync();
+            try
+            {
+                CommsPurge();
+
+                // Send the request
+                _log.DebugFormat("Writing {0} records to file number {1} from record number {2} on {3}", len / 2, fileNo, recNo, addr);
+                _comms.Write(txData, 0, READ_FILE_RECORD_TX_LEN);
+
+                // Get the response
+                rxData = await CommsReceive(expectedLen);
+            }
+            finally { _semaphore.Release(); }
 
             // Validate the response
             // TODO - verify record response length and reference type
@@ -894,16 +930,20 @@ namespace VVG.Modbus
             txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 2] = (byte)(crc & 0x00FF);
             txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 1] = (byte)((crc & 0xFF00) >> 8);
 
+            byte[] rxData = null;
             await _semaphore.WaitAsync();
-            CommsPurge();
+            try
+            {
+                CommsPurge();
 
-            // Send the request
-            _log.DebugFormat("Writing {0} records to file number {1} from record number {2} on {3}", txFileRecs.Length / 2, fileNo, recNo, addr);
-            _comms.Write(txData, 0, WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
+                // Send the request
+                _log.DebugFormat("Writing {0} records to file number {1} from record number {2} on {3}", txFileRecs.Length / 2, fileNo, recNo, addr);
+                _comms.Write(txData, 0, WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
 
-            // Get the response
-            var rxData = await CommsReceive(WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
-
+                // Get the response
+                rxData = await CommsReceive(WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
+            }
+            finally { _semaphore.Release(); }
 
             // Validate the response
             if (rxData.Length != (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length))
