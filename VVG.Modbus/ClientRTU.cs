@@ -176,7 +176,7 @@ namespace VVG.Modbus
         }
         #endregion
 
-        private SemaphoreSlim _semaphore = new SemaphoreSlim(0, 1);
+        private SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// Read single coil
