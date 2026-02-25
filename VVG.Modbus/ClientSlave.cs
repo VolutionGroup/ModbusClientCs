@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO.Ports;
+using System.ComponentModel;
 
 namespace VVG.Modbus
 {
@@ -11,16 +12,25 @@ namespace VVG.Modbus
     {
         public IClient Client { get; set; }
         public byte Address { get; set; }
-        
+
+        [Obsolete("Instantiate passing IClient and Address preferred."), EditorBrowsable(EditorBrowsableState.Never)]
         public ClientSlave()
         {
             // Assumed caller will initialise Client and Address via the Property accessors
         }
 
+        [Obsolete("Instantiate passing IClient and Address preferred."), EditorBrowsable(EditorBrowsableState.Never)]
         public ClientSlave(SerialPort port, byte address)
         {
             // Instantiate as RTU
             Client = new ClientRTU(port);
+            Address = address;
+        }
+
+        public ClientSlave(IClient client, byte address)
+        {
+            // Use the passed IClient directly
+            Client = client;
             Address = address;
         }
 
