@@ -14,7 +14,7 @@ namespace VVG.Modbus
     public class ClientTCP_RTU : ClientRTU_Base
     {
         private readonly TcpClient _tcpClient;
-        ClientTCP_RTU(TcpClient tcpClient)
+        public ClientTCP_RTU(TcpClient tcpClient)
         {
             _tcpClient = tcpClient;
             Timeout = TimeSpan.FromMilliseconds(500);

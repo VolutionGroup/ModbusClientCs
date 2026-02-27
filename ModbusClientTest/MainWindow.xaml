@@ -10,9 +10,10 @@
         Loaded="Window_Loaded">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="30" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="1*" />
-            <RowDefinition Height="30" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Label Content="Serial Port" VerticalAlignment="Center" />
@@ -26,7 +27,14 @@
         <Button x:Name="cmdConnect" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="425,0,0,0" Width="70" Content="Connect" Click="cmdConnect_Click" />
         <Button x:Name="cmdDisconnect" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="500,0,0,0" Width="70" Content="Disconnect" IsEnabled="False" Click="cmdDisconnect_Click" />
 
-        <TabControl Grid.Row="1" IsEnabled="False" x:Name="tabs">
+        <Label Content="IP / Host" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" />
+        <TextBox x:Name="txtIpHost" Grid.Row="1" Margin="65,0,0,0" Width="70" VerticalAlignment="Center" HorizontalAlignment="Left" />
+        <Label Content="Port" Grid.Row="1" Margin="135,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
+        <TextBox x:Name="txtPort" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="175,0,0,0" Width="60" />
+        <Button x:Name="cmdConnectTCP" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="425,0,0,0" Width="70" Content="Connect" Click="cmdConnectTCP_Click" />
+        <Button x:Name="cmdDisconnectTCP" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="500,0,0,0" Width="70" Content="Disconnect" IsEnabled="False" Click="cmdDisconnectTCP_Click" />
+
+        <TabControl Grid.Row="2" IsEnabled="False" x:Name="tabs">
             <TabItem Header="Coils">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -180,7 +188,7 @@
             </TabItem>
         </TabControl>
 
-        <StatusBar Grid.Row="2">
+        <StatusBar Grid.Row="3">
             <StatusBarItem x:Name="lblStatus" Content="Disconnected" VerticalAlignment="Center" />
             <StatusBarItem VerticalAlignment="Center" HorizontalAlignment="Right">
                 <Grid>

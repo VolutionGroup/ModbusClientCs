@@ -16,6 +16,7 @@ using System.IO.Ports;
 using Microsoft.Win32;
 using System.IO;
 using log4net;
+using System.Net.Sockets;
 
 namespace VVG.Modbus.ClientTest
 {
@@ -26,7 +27,8 @@ namespace VVG.Modbus.ClientTest
     {
         private static readonly ILog _log = LogManager.GetLogger(typeof(MainWindow));
         private ClientSlave _slave = new ClientSlave();
-        private SerialPort _port = null;
+        private SerialPort _serialPort = null;
+        private TcpClient _tcpClient = null;
 
         private List<Coil> _coils = new List<Coil>();
         private List<DiscreteInput> _discreteInputs = new List<DiscreteInput>();
@@ -176,15 +178,20 @@ namespace VVG.Modbus.ClientTest
             }
         }
 
-        private void UpdateConnected(bool connected)
+        private void UpdateConnected()
         {
-            lblStatus.Content = connected ? "Connected" : "Disconnected";
-            cmdDisconnect.IsEnabled = connected;
-            cmdConnect.IsEnabled = !connected;
-            tabs.IsEnabled = connected;
-            txtBaudRate.IsEnabled = !connected;
-            cboParity.IsEnabled = !connected;
-            txtSlaveID.IsEnabled = !connected;
+            bool serialOpen = ((_serialPort != null) && (_serialPort.IsOpen));
+            bool tcpOpen = ((_tcpClient != null) && (_tcpClient.Connected));
+            
+            lblStatus.Content = (serialOpen || tcpOpen) ? "Connected" : "Disconnected";
+            cmdDisconnect.IsEnabled = serialOpen;
+            cmdConnect.IsEnabled = !(serialOpen || tcpOpen);
+            tabs.IsEnabled = (serialOpen || tcpOpen);
+            txtBaudRate.IsEnabled = !serialOpen;
+            cboParity.IsEnabled = !serialOpen;
+            txtSlaveID.IsEnabled = !(serialOpen || tcpOpen);
+            cmdDisconnectTCP.IsEnabled = tcpOpen;
+            cmdConnectTCP.IsEnabled = !(serialOpen || tcpOpen);
         }
         #endregion
 
@@ -192,16 +199,16 @@ namespace VVG.Modbus.ClientTest
         {
             try
             {
-                _port = new SerialPort((string)cboSerialPort.SelectedItem)
+                _serialPort = new SerialPort((string)cboSerialPort.SelectedItem)
                 {
                     BaudRate = int.Parse(txtBaudRate.Text),
                     Parity = (Parity)Enum.Parse(typeof(Parity), (string)cboParity.SelectedItem)
                 };
-                _port.Open();
-                _slave.Client = new ClientRTU(_port);
+                _serialPort.Open();
+                _slave.Client = new ClientRTU(_serialPort);
 
                 _log.InfoFormat("Connected to {0} @ {1}/{2}", cboSerialPort.SelectedItem, txtBaudRate.Text, cboParity.SelectedItem);
-                UpdateConnected(true);
+                UpdateConnected();
             }
             catch (Exception ex)
             {
@@ -211,12 +218,12 @@ namespace VVG.Modbus.ClientTest
 
         private void cmdDisconnect_Click(object sender, RoutedEventArgs e)
         {
-            _port.Close();
-            _port = null;
+            _serialPort.Close();
+            _serialPort = null;
             _slave.Client = null;
 
             _log.Info("COM port disconnected");
-            UpdateConnected(false);
+            UpdateConnected();
         }
 
         private void cmdBrowseFile_Click(object sender, RoutedEventArgs e)
@@ -718,6 +725,33 @@ namespace VVG.Modbus.ClientTest
             }
 
             UpdateInputRegisters(values, startNo);
+        }
+
+        private void cmdConnectTCP_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _tcpClient = new TcpClient();
+                _tcpClient.Connect(txtIpHost.Text, int.Parse(txtPort.Text));
+                _slave.Client = new ClientTCP_RTU(_tcpClient);
+
+                _log.InfoFormat("Connected to {0} @ {1}/{2}", cboSerialPort.SelectedItem, txtBaudRate.Text, cboParity.SelectedItem);
+                UpdateConnected();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to open serial port: " + ex.Message, "Connection failure");
+            }
+        }
+
+        private void cmdDisconnectTCP_Click(object sender, RoutedEventArgs e)
+        {
+            _tcpClient.Close();
+            _tcpClient = null;
+            _slave.Client = null;
+
+            _log.Info("COM port disconnected");
+            UpdateConnected();
         }
     }
 
