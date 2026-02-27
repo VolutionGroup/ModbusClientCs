@@ -30,7 +30,8 @@
         <Label Content="IP / Host" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" />
         <TextBox x:Name="txtIpHost" Grid.Row="1" Margin="65,0,0,0" Width="70" VerticalAlignment="Center" HorizontalAlignment="Left" />
         <Label Content="Port" Grid.Row="1" Margin="135,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
-        <TextBox x:Name="txtPort" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="175,0,0,0" Width="60" />
+        <TextBox x:Name="txtPort" Text="502" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="175,0,0,0" Width="60" />
+        <Label Content="RTU over TCP Client" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="235,0,0,0" />
         <Button x:Name="cmdConnectTCP" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="425,0,0,0" Width="70" Content="Connect" Click="cmdConnectTCP_Click" />
         <Button x:Name="cmdDisconnectTCP" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="500,0,0,0" Width="70" Content="Disconnect" IsEnabled="False" Click="cmdDisconnectTCP_Click" />
 
