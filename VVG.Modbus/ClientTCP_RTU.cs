@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
@@ -16,7 +17,7 @@ namespace VVG.Modbus
         ClientTCP_RTU(TcpClient tcpClient)
         {
             _tcpClient = tcpClient;
-            Timeout = TimeSpan.FromMilliseconds(500);
+            //Timeout = TimeSpan.FromSeconds(5); // TBC
         }
 
         public override bool IsConnected
@@ -27,26 +28,21 @@ namespace VVG.Modbus
             }
         }
 
-        public override TimeSpan Timeout
-        {
-            get
-            {
-                return TimeSpan.FromMilliseconds(_tcpClient.ReceiveTimeout);
-            }
-
-            set
-            {
-                _tcpClient.ReceiveTimeout = (int)value.TotalMilliseconds;
-                _tcpClient.SendTimeout = (int)value.TotalMilliseconds;
-            }
-        }
+        public override TimeSpan Timeout { get; set; }
 
         protected override async Task<byte[]> CommsReceive(int len)
         {
             var stream = _tcpClient.GetStream();
             var data = new byte[len];
-            var rxLen = await stream.ReadAsync(data, 0, len); // TBC how this works WRT timeout and requested number of bytes - may need extra timeout handling?
-            if (rxLen != len) throw new Exception(String.Format("Only received {0} of {1} requested bytes", rxLen, len));
+            var sw = new Stopwatch();
+            int rxCount = 0;
+            sw.Restart();
+            while ((sw.Elapsed < Timeout) && (rxCount < len))
+            {
+                var rxLen = await stream.ReadAsync(data, rxCount, len - rxCount);
+                rxCount += rxLen;
+            }
+            if (rxCount != len) throw new Exception(String.Format("Only received {0} of {1} requested bytes within {2}", rxCount, len, Timeout));
             return data;
         }
 
@@ -56,6 +52,7 @@ namespace VVG.Modbus
             stream.Flush(); // TBC if this clears the receive buffer?
             if (_tcpClient.Available > 0)
             {
+                // Actuall pull from the stream to be sure
                 var scratch = new byte[_tcpClient.Available];
                 stream.Read(scratch, 0, scratch.Length);
             }
