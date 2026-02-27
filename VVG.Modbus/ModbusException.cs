@@ -57,7 +57,7 @@ namespace VVG.Modbus
             }
             else if (len == 5)
             {
-                UInt16 crc = ClientRTU.Crc16(buffer, 3);
+                UInt16 crc = Crc16.Calc(buffer, 3);
                 if (((crc & 0x00FF) != buffer[3])
                     || (((crc & 0xFF00) >> 8) != buffer[4]))
                 {

@@ -130,7 +130,7 @@ namespace VVG.Modbus
             txData[4] = (byte)((len & 0xFF00) >> 8);
             txData[5] = (byte)(len & 0x00FF);
 
-            UInt16 crc = Crc16(txData, 6);
+            UInt16 crc = Crc16.Calc(txData, 6);
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
@@ -161,7 +161,7 @@ namespace VVG.Modbus
             }
 
             // Check the CRC
-            crc = Crc16(rxData, expectedDataCount + 3);
+            crc = Crc16.Calc(rxData, expectedDataCount + 3);
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
@@ -228,7 +228,7 @@ namespace VVG.Modbus
             txData[4] = (byte)((len & 0xFF00) >> 8);
             txData[5] = (byte)(len & 0x00FF);
 
-            UInt16 crc = Crc16(txData, 6);
+            UInt16 crc = Crc16.Calc(txData, 6);
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
@@ -259,7 +259,7 @@ namespace VVG.Modbus
             }
 
             // Check the CRC
-            crc = Crc16(rxData, expectedDataCount + 3);
+            crc = Crc16.Calc(rxData, expectedDataCount + 3);
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
@@ -327,7 +327,7 @@ namespace VVG.Modbus
             txData[4] = (byte)((len & 0xFF00) >> 8);
             txData[5] = (byte)(len & 0x00FF);
 
-            UInt16 crc = Crc16(txData, 6);
+            UInt16 crc = Crc16.Calc(txData, 6);
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
@@ -350,7 +350,7 @@ namespace VVG.Modbus
                 throw new ModbusException(rxData);
             }
 
-            crc = Crc16(rxData, rxData[2] + 3);
+            crc = Crc16.Calc(rxData, rxData[2] + 3);
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
@@ -405,7 +405,7 @@ namespace VVG.Modbus
             txData[4] = (byte)((len & 0xFF00) >> 8);
             txData[5] = (byte)(len & 0x00FF);
 
-            UInt16 crc = Crc16(txData, 6);
+            UInt16 crc = Crc16.Calc(txData, 6);
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
             int expectedLen = READ_IR_RX_OVERHEAD + (len * 2);
@@ -427,7 +427,7 @@ namespace VVG.Modbus
                 throw new ModbusException(rxData);
             }
 
-            crc = Crc16(rxData, rxData[2] + 3);
+            crc = Crc16.Calc(rxData, rxData[2] + 3);
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
@@ -466,7 +466,7 @@ namespace VVG.Modbus
             txData[4] = (byte)(txCoil ? 0xff : 0x00);
             txData[5] = (byte)0x00;
 
-            UInt16 crc = Crc16(txData, 6);
+            UInt16 crc = Crc16.Calc(txData, 6);
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
@@ -521,7 +521,7 @@ namespace VVG.Modbus
             txData[4] = (byte)((txReg & 0xFF00) >> 8);
             txData[5] = (byte)(txReg & 0x00FF);
 
-            UInt16 crc = Crc16(txData, 6);
+            UInt16 crc = Crc16.Calc(txData, 6);
             txData[6] = (byte)(crc & 0x00FF);
             txData[7] = (byte)((crc & 0xFF00) >> 8);
 
@@ -604,7 +604,7 @@ namespace VVG.Modbus
 
             txData[6] = (byte)(txLen - 6);
 
-            UInt16 crc = Crc16(txData, txLen);
+            UInt16 crc = Crc16.Calc(txData, txLen);
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
             Array.Resize(ref txData, txLen);
@@ -635,7 +635,7 @@ namespace VVG.Modbus
             }
 
             // Verify CRC
-            crc = Crc16(rxData, rxData.Length - 2);
+            crc = Crc16.Calc(rxData, rxData.Length - 2);
             if (((crc & 0x00FF) != rxData[rxData.Length - 2])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData.Length - 1]))
             {
@@ -682,7 +682,7 @@ namespace VVG.Modbus
             }
 
             int txLen = WRITE_HRS_TX_OVERHEAD - 2 + (txRegs.Length * 2);
-            UInt16 crc = Crc16(txData, txLen);
+            UInt16 crc = Crc16.Calc(txData, txLen);
             txData[txLen++] = (byte)(crc & 0x00FF);
             txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
             Array.Resize(ref txData, txLen);
@@ -713,7 +713,7 @@ namespace VVG.Modbus
             }
 
             // Verify CRC
-            crc = Crc16(rxData, rxData.Length - 2);
+            crc = Crc16.Calc(rxData, rxData.Length - 2);
             if (((crc & 0x00FF) != rxData[rxData.Length - 2])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData.Length - 1]))
             {
@@ -754,7 +754,7 @@ namespace VVG.Modbus
             txData[8] = (byte)(((len / 2) & 0xFF00) >> 8);
             txData[9] = (byte)((len / 2) & 0x00FF);  // record length = byte length / 2
 
-            UInt16 crc = Crc16(txData, 10);
+            UInt16 crc = Crc16.Calc(txData, 10);
             txData[10] = (byte)(crc & 0x00FF);
             txData[11] = (byte)((crc & 0xFF00) >> 8);
 
@@ -782,7 +782,7 @@ namespace VVG.Modbus
                 throw new ModbusException(rxData);
             }
 
-            crc = Crc16(rxData, rxData[2] + 3);
+            crc = Crc16.Calc(rxData, rxData[2] + 3);
             if (((crc & 0x00FF) != rxData[rxData[2] + 3])
                 || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
             {
@@ -829,7 +829,7 @@ namespace VVG.Modbus
 
             Array.Copy(txFileRecs, 0, txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2, txFileRecs.Length);
 
-            UInt16 crc = Crc16(txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2 + txFileRecs.Length);
+            UInt16 crc = Crc16.Calc(txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2 + txFileRecs.Length);
             txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 2] = (byte)(crc & 0x00FF);
             txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 1] = (byte)((crc & 0xFF00) >> 8);
 
@@ -863,56 +863,6 @@ namespace VVG.Modbus
             }
 
             _log.DebugFormat("Wrote {0} bytes", txFileRecs.Length);
-        }
-
-        static readonly UInt16[] CRC16_TABLE = new UInt16[]
-        {
-            (UInt16)0x0000, (UInt16)0xC0C1, (UInt16)0xC181, (UInt16)0x0140, (UInt16)0xC301, (UInt16)0x03C0, (UInt16)0x0280, (UInt16)0xC241,
-            (UInt16)0xC601, (UInt16)0x06C0, (UInt16)0x0780, (UInt16)0xC741, (UInt16)0x0500, (UInt16)0xC5C1, (UInt16)0xC481, (UInt16)0x0440,
-            (UInt16)0xCC01, (UInt16)0x0CC0, (UInt16)0x0D80, (UInt16)0xCD41, (UInt16)0x0F00, (UInt16)0xCFC1, (UInt16)0xCE81, (UInt16)0x0E40,
-            (UInt16)0x0A00, (UInt16)0xCAC1, (UInt16)0xCB81, (UInt16)0x0B40, (UInt16)0xC901, (UInt16)0x09C0, (UInt16)0x0880, (UInt16)0xC841,
-            (UInt16)0xD801, (UInt16)0x18C0, (UInt16)0x1980, (UInt16)0xD941, (UInt16)0x1B00, (UInt16)0xDBC1, (UInt16)0xDA81, (UInt16)0x1A40,
-            (UInt16)0x1E00, (UInt16)0xDEC1, (UInt16)0xDF81, (UInt16)0x1F40, (UInt16)0xDD01, (UInt16)0x1DC0, (UInt16)0x1C80, (UInt16)0xDC41,
-            (UInt16)0x1400, (UInt16)0xD4C1, (UInt16)0xD581, (UInt16)0x1540, (UInt16)0xD701, (UInt16)0x17C0, (UInt16)0x1680, (UInt16)0xD641,
-            (UInt16)0xD201, (UInt16)0x12C0, (UInt16)0x1380, (UInt16)0xD341, (UInt16)0x1100, (UInt16)0xD1C1, (UInt16)0xD081, (UInt16)0x1040,
-            (UInt16)0xF001, (UInt16)0x30C0, (UInt16)0x3180, (UInt16)0xF141, (UInt16)0x3300, (UInt16)0xF3C1, (UInt16)0xF281, (UInt16)0x3240,
-            (UInt16)0x3600, (UInt16)0xF6C1, (UInt16)0xF781, (UInt16)0x3740, (UInt16)0xF501, (UInt16)0x35C0, (UInt16)0x3480, (UInt16)0xF441,
-            (UInt16)0x3C00, (UInt16)0xFCC1, (UInt16)0xFD81, (UInt16)0x3D40, (UInt16)0xFF01, (UInt16)0x3FC0, (UInt16)0x3E80, (UInt16)0xFE41,
-            (UInt16)0xFA01, (UInt16)0x3AC0, (UInt16)0x3B80, (UInt16)0xFB41, (UInt16)0x3900, (UInt16)0xF9C1, (UInt16)0xF881, (UInt16)0x3840,
-            (UInt16)0x2800, (UInt16)0xE8C1, (UInt16)0xE981, (UInt16)0x2940, (UInt16)0xEB01, (UInt16)0x2BC0, (UInt16)0x2A80, (UInt16)0xEA41,
-            (UInt16)0xEE01, (UInt16)0x2EC0, (UInt16)0x2F80, (UInt16)0xEF41, (UInt16)0x2D00, (UInt16)0xEDC1, (UInt16)0xEC81, (UInt16)0x2C40,
-            (UInt16)0xE401, (UInt16)0x24C0, (UInt16)0x2580, (UInt16)0xE541, (UInt16)0x2700, (UInt16)0xE7C1, (UInt16)0xE681, (UInt16)0x2640,
-            (UInt16)0x2200, (UInt16)0xE2C1, (UInt16)0xE381, (UInt16)0x2340, (UInt16)0xE101, (UInt16)0x21C0, (UInt16)0x2080, (UInt16)0xE041,
-            (UInt16)0xA001, (UInt16)0x60C0, (UInt16)0x6180, (UInt16)0xA141, (UInt16)0x6300, (UInt16)0xA3C1, (UInt16)0xA281, (UInt16)0x6240,
-            (UInt16)0x6600, (UInt16)0xA6C1, (UInt16)0xA781, (UInt16)0x6740, (UInt16)0xA501, (UInt16)0x65C0, (UInt16)0x6480, (UInt16)0xA441,
-            (UInt16)0x6C00, (UInt16)0xACC1, (UInt16)0xAD81, (UInt16)0x6D40, (UInt16)0xAF01, (UInt16)0x6FC0, (UInt16)0x6E80, (UInt16)0xAE41,
-            (UInt16)0xAA01, (UInt16)0x6AC0, (UInt16)0x6B80, (UInt16)0xAB41, (UInt16)0x6900, (UInt16)0xA9C1, (UInt16)0xA881, (UInt16)0x6840,
-            (UInt16)0x7800, (UInt16)0xB8C1, (UInt16)0xB981, (UInt16)0x7940, (UInt16)0xBB01, (UInt16)0x7BC0, (UInt16)0x7A80, (UInt16)0xBA41,
-            (UInt16)0xBE01, (UInt16)0x7EC0, (UInt16)0x7F80, (UInt16)0xBF41, (UInt16)0x7D00, (UInt16)0xBDC1, (UInt16)0xBC81, (UInt16)0x7C40,
-            (UInt16)0xB401, (UInt16)0x74C0, (UInt16)0x7580, (UInt16)0xB541, (UInt16)0x7700, (UInt16)0xB7C1, (UInt16)0xB681, (UInt16)0x7640,
-            (UInt16)0x7200, (UInt16)0xB2C1, (UInt16)0xB381, (UInt16)0x7340, (UInt16)0xB101, (UInt16)0x71C0, (UInt16)0x7080, (UInt16)0xB041,
-            (UInt16)0x5000, (UInt16)0x90C1, (UInt16)0x9181, (UInt16)0x5140, (UInt16)0x9301, (UInt16)0x53C0, (UInt16)0x5280, (UInt16)0x9241,
-            (UInt16)0x9601, (UInt16)0x56C0, (UInt16)0x5780, (UInt16)0x9741, (UInt16)0x5500, (UInt16)0x95C1, (UInt16)0x9481, (UInt16)0x5440,
-            (UInt16)0x9C01, (UInt16)0x5CC0, (UInt16)0x5D80, (UInt16)0x9D41, (UInt16)0x5F00, (UInt16)0x9FC1, (UInt16)0x9E81, (UInt16)0x5E40,
-            (UInt16)0x5A00, (UInt16)0x9AC1, (UInt16)0x9B81, (UInt16)0x5B40, (UInt16)0x9901, (UInt16)0x59C0, (UInt16)0x5880, (UInt16)0x9841,
-            (UInt16)0x8801, (UInt16)0x48C0, (UInt16)0x4980, (UInt16)0x8941, (UInt16)0x4B00, (UInt16)0x8BC1, (UInt16)0x8A81, (UInt16)0x4A40,
-            (UInt16)0x4E00, (UInt16)0x8EC1, (UInt16)0x8F81, (UInt16)0x4F40, (UInt16)0x8D01, (UInt16)0x4DC0, (UInt16)0x4C80, (UInt16)0x8C41,
-            (UInt16)0x4400, (UInt16)0x84C1, (UInt16)0x8581, (UInt16)0x4540, (UInt16)0x8701, (UInt16)0x47C0, (UInt16)0x4680, (UInt16)0x8641,
-            (UInt16)0x8201, (UInt16)0x42C0, (UInt16)0x4380, (UInt16)0x8341, (UInt16)0x4100, (UInt16)0x81C1, (UInt16)0x8081, (UInt16)0x4040
-        };
-
-        static public UInt16 Crc16(byte[] data, int len)
-        {
-            byte temp;
-            UInt16 crc = 0xFFFF;
-            int i = 0;
-            while (len-- > 0)
-            {
-                temp = (byte)(data[i++] ^ crc);
-                crc >>= 8;
-                crc ^= CRC16_TABLE[temp];
-            }
-            return crc;
         }
     }
 }
