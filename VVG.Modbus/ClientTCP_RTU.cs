@@ -17,7 +17,7 @@ namespace VVG.Modbus
         ClientTCP_RTU(TcpClient tcpClient)
         {
             _tcpClient = tcpClient;
-            //Timeout = TimeSpan.FromSeconds(5); // TBC
+            Timeout = TimeSpan.FromMilliseconds(500);
         }
 
         public override bool IsConnected
@@ -28,7 +28,19 @@ namespace VVG.Modbus
             }
         }
 
-        public override TimeSpan Timeout { get; set; }
+        public override TimeSpan Timeout
+        {
+            get
+            {
+                return TimeSpan.FromMilliseconds(_tcpClient.ReceiveTimeout);
+            }
+
+            set
+            {
+                _tcpClient.ReceiveTimeout = (int)value.TotalMilliseconds;
+                _tcpClient.SendTimeout = (int)value.TotalMilliseconds;
+            }
+        }
 
         protected override async Task<byte[]> CommsReceive(int len)
         {
@@ -37,8 +49,10 @@ namespace VVG.Modbus
             var sw = new Stopwatch();
             int rxCount = 0;
             sw.Restart();
+            stream.ReadTimeout = (int)Timeout.TotalMilliseconds; // just in case?
             while ((sw.Elapsed < Timeout) && (rxCount < len))
             {
+                // TBC the best way of dealing with this?
                 var rxLen = await stream.ReadAsync(data, rxCount, len - rxCount);
                 rxCount += rxLen;
             }
