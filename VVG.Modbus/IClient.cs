@@ -13,6 +13,8 @@ namespace VVG.Modbus
         /// </summary>
         bool IsConnected { get; }
 
+        TimeSpan Timeout { get; set; }
+
         /// <summary>
         /// Read a single coil register
         /// </summary>

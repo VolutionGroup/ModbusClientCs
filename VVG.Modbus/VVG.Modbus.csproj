@@ -48,6 +48,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ClientRTU_Base.cs" />
+    <Compile Include="ClientTCP_RTU.cs" />
     <Compile Include="IClient.cs" />
     <Compile Include="ClientRTU.cs" />
     <Compile Include="ClientSlave.cs" />
