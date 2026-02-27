@@ -45,7 +45,7 @@ namespace VVG.Modbus
         {
             var stream = _tcpClient.GetStream();
             var data = new byte[len];
-            var rxLen = await stream.ReadAsync(data, 0, len);
+            var rxLen = await stream.ReadAsync(data, 0, len); // TBC how this works WRT timeout and requested number of bytes - may need extra timeout handling?
             if (rxLen != len) throw new Exception(String.Format("Only received {0} of {1} requested bytes", rxLen, len));
             return data;
         }
@@ -53,7 +53,12 @@ namespace VVG.Modbus
         protected override void CommsSend(byte[] data)
         {
             var stream = _tcpClient.GetStream();
-            stream.Flush();
+            stream.Flush(); // TBC if this clears the receive buffer?
+            if (_tcpClient.Available > 0)
+            {
+                var scratch = new byte[_tcpClient.Available];
+                stream.Read(scratch, 0, scratch.Length);
+            }
             stream.Write(data, 0, data.Length);
         }
     }
