@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace VVG.Modbus
@@ -37,6 +38,7 @@ namespace VVG.Modbus
 
             set
             {
+                // The trouble is these don't work on TCP sockets...
                 _tcpClient.ReceiveTimeout = (int)value.TotalMilliseconds;
                 _tcpClient.SendTimeout = (int)value.TotalMilliseconds;
             }
@@ -44,19 +46,20 @@ namespace VVG.Modbus
 
         protected override async Task<byte[]> CommsReceive(int len)
         {
-            var stream = _tcpClient.GetStream();
-            var data = new byte[len];
             var sw = new Stopwatch();
-            int rxCount = 0;
             sw.Restart();
-            stream.ReadTimeout = (int)Timeout.TotalMilliseconds; // just in case?
-            while ((sw.Elapsed < Timeout) && (rxCount < len))
+            while ((sw.Elapsed < Timeout) && (_tcpClient.Available < len))
             {
                 // TBC the best way of dealing with this?
-                var rxLen = await stream.ReadAsync(data, rxCount, len - rxCount);
-                rxCount += rxLen;
+                // - polling stream.Length can't be best practise and setting up a listener thread seems OTT!
+                await Task.Delay(1);
             }
-            if (rxCount != len) throw new Exception(String.Format("Only received {0} of {1} requested bytes within {2}", rxCount, len, Timeout));
+
+            if (_tcpClient.Available < len) throw new Exception(String.Format("Error - {0} of {1} requested bytes received within {2}", _tcpClient.Available, len, Timeout));
+
+            var data = new byte[len];
+            var stream = _tcpClient.GetStream();
+            stream.Read(data, 0, len);
             return data;
         }
 
