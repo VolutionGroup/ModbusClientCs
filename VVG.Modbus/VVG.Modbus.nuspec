@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>VVG.Modbus</id>
-    <version>1.1.2.0</version>
+    <version>1.1.3.0</version>
     <title>VVG.ModbusClient</title>
     <authors>Volution Ventilation Group</authors>
     <owners>Volution Ventilation Group</owners>
@@ -11,8 +11,8 @@
     <summary>Modbus RTU client with access to coils, discrete inputs, holding registers, input registers and file records</summary>
     <copyright>Copyright © Volution Ventilation Group 2026</copyright>
     <dependencies>
-      <group targetFramework=".NETFramework4.5">
-        <dependency id="log4net" version="2.0.16" />
+      <group targetFramework=".NETFramework4.8">
+        <dependency id="log4net" version="3.3.1" />
       </group>
     </dependencies>
   </metadata>
