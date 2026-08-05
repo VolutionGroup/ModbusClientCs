@@ -309,7 +309,7 @@ namespace VVG.Modbus.ClientTest
                     retries = 0;
                 }
 
-                UpdateProgress(100 * i / len);
+                UpdateProgress(100.0f * i / len);
             }
 
             _log.Info("File read complete");
