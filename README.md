@@ -16,4 +16,4 @@ Supported functions:
 
 No enforced minimum idle time between last response and next command
 
-Based on SharedCode C++ (internal)
+Based on SharedCode C++ (internal) https://github.com/VolutionGroup/ModbusMaster
