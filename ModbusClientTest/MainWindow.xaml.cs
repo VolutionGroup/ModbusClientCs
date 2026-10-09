@@ -1,7 +1,13 @@
-﻿using System;
+﻿using log4net;
+using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Ports;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,11 +18,6 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using System.IO.Ports;
-using Microsoft.Win32;
-using System.IO;
-using log4net;
-using System.Net.Sockets;
 
 namespace VVG.Modbus.ClientTest
 {
@@ -408,11 +409,18 @@ namespace VVG.Modbus.ClientTest
                 catch (Exception ex)
                 {
                     _log.ErrorFormat("Write request failed at {0}/{1} (attempt {2}) - exception {3}", i, len, retries, ex);
-                    if (++retries > 5)
+                    if (++retries > 10)
                     {
+                        if (MessageBox.Show(String.Format("Retries exhausted trying to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}\n\n\nAttempt to continue?",
+                            i, len, ex), "File transfer issue", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                        {
+                            retries = 0;
+                            continue;
+                        }
                         MessageBox.Show(String.Format("Failed to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}", i, len, ex), "Fail");
                         return;
                     }
+                    Thread.Sleep(250);
                     continue;
                 }
 
