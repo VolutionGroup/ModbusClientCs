@@ -18,6 +18,10 @@ namespace VVG.Modbus
         public abstract bool IsConnected { get; }
         public abstract TimeSpan Timeout { get; set; }
 
+        /// <summary>Allow vendor-specific file-write record addresses through 65535 instead of 9999.</summary>
+        /// <remarks>Off by default. Enable only for devices exposing 128 KiB files in the full 16-bit record space.</remarks>
+        public bool AllowExtendedFileRecordAddresses { get; set; }
+
         protected static readonly ILog _log = LogManager.GetLogger(typeof(ClientRTU_Base));
 
         // Slave addresses pass through unless a specific operation validates them.
@@ -776,7 +780,8 @@ namespace VVG.Modbus
             {
                 throw new ArgumentOutOfRangeException(nameof(txFileRecs));
             }
-            if ((recNo > 9999) || ((int)recNo + (txFileRecs.Length / 2) > 10000))
+            int recordLimit = AllowExtendedFileRecordAddresses ? 65536 : 10000;
+            if ((recNo >= recordLimit) || ((int)recNo + (txFileRecs.Length / 2) > recordLimit))
             {
                 throw new ArgumentOutOfRangeException(nameof(recNo));
             }

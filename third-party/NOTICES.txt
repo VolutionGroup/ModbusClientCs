@@ -1,0 +1,8 @@
+This client distribution includes log4net 3.3.1.
+
+Copyright 2004–2026 The Apache Software Foundation.
+https://logging.apache.org/log4net/
+
+log4net is licensed under the Apache License, Version 2.0. The full license is
+included as log4net.LICENSE.txt. VVG.Modbus and the client test application are
+provided under the included MIT LICENSE.

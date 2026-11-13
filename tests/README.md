@@ -1,5 +1,15 @@
 # RTU regression checks
 
+The WPF monitoring/file-transfer checks are separate:
+
+```text
+python tests/run_ui_tests.py
+```
+
+They build the actual test application and run 18 checks without hardware. See
+[the test-harness guide](../ModbusClientTest/README.md) for the controls, transfer
+behaviour and optional rendered-preview output.
+
 Run from the repository root on Windows:
 
 ```text

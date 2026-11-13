@@ -67,6 +67,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Compile Include="RefreshCoordinator.cs" />
+    <Compile Include="FileTransferRunner.cs" />
+    <Compile Include="MainWindow.Refresh.cs" />
+    <Compile Include="ActivityLogAppender.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>

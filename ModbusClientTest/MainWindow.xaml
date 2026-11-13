@@ -6,13 +6,16 @@
         xmlns:local="clr-namespace:VVG.Modbus.ClientTest"
         mc:Ignorable="d"
         Title="VVG.Modbus.Client Test" 
-        Height="350" Width="600"
+        Height="390" Width="640" MinHeight="420" MinWidth="610"
+        WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded">
-    <Grid>
+    <Grid Background="{DynamicResource {x:Static SystemColors.ControlBrushKey}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="1*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -35,7 +38,24 @@
         <Button x:Name="cmdConnectTCP" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="425,0,0,0" Width="70" Content="Connect" Click="cmdConnectTCP_Click" />
         <Button x:Name="cmdDisconnectTCP" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="500,0,0,0" Width="70" Content="Disconnect" IsEnabled="False" Click="cmdDisconnectTCP_Click" />
 
-        <TabControl Grid.Row="2" IsEnabled="False" x:Name="tabs">
+        <Border Grid.Row="2" BorderBrush="#DDDDDD" BorderThickness="0,1" Padding="6,5" Margin="0,4,0,0">
+            <DockPanel LastChildFill="True">
+                <TextBlock Text="Timeout (ms)" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBox x:Name="txtCommandTimeout" Text="500" Width="65" VerticalAlignment="Center" Margin="0,0,12,0"
+                         ToolTip="Command timeout: 1 to 600000 ms; applied before the next operation"
+                         TextChanged="CommandTimeoutChanged" />
+                <CheckBox x:Name="chkAutoRefresh" Content="Auto-refresh" VerticalAlignment="Center"
+                          Margin="0,0,12,0" Checked="RefreshSettingsChanged" Unchecked="RefreshSettingsChanged" />
+                <TextBlock Text="Interval (ms)" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBox x:Name="txtRefreshInterval" Text="1000" Width="80" VerticalAlignment="Center"
+                         ToolTip="100 to 3600000 ms between completed reads"
+                         TextChanged="RefreshIntervalChanged" />
+                <TextBlock x:Name="txtRefreshStatus" Text="Off" VerticalAlignment="Center" Margin="12,0,0,0"
+                           Foreground="DimGray" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+
+        <TabControl Grid.Row="3" IsEnabled="False" x:Name="tabs" SelectedIndex="0" SelectionChanged="TabsSelectionChanged">
             <TabItem Header="Coils">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -62,7 +82,7 @@
                     <Button x:Name="cmdReadCoils" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read Coils" Margin="5,0" Click="cmdReadCoils_Click" />
                     <Button x:Name="cmdWriteCoils" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write Coils" Margin="5,0" Click="cmdWriteCoils_Click" />
 
-                    <DataGrid x:Name="dgCoils" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
+                    <DataGrid BeginningEdit="GridBeginningEdit" RowEditEnding="GridRowEditEnding" x:Name="dgCoils" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
                 </Grid>
             </TabItem>
             
@@ -119,7 +139,7 @@
                     <Button x:Name="cmdReadHRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="1" Content="Read HRs" Margin="5,0" Click="cmdReadHRs_Click" />
                     <Button x:Name="cmdWriteHRs" VerticalAlignment="Center" Grid.Row="2" Grid.Column="2" Content="Write HRs" Margin="5,0" Click="cmdWriteHRs_Click" />
 
-                    <DataGrid x:Name="dgHoldingRegisters" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
+                    <DataGrid BeginningEdit="GridBeginningEdit" RowEditEnding="GridRowEditEnding" x:Name="dgHoldingRegisters" Grid.Row="10" Grid.ColumnSpan="10" Margin="5" />
                 </Grid>
             </TabItem>
             
@@ -170,7 +190,7 @@
                     </Grid.ColumnDefinitions>
 
                     <Label Content="File Number" VerticalAlignment="Center" />
-                    <TextBox x:Name="txtFileNum" VerticalAlignment="Center" Grid.Column="1" Text="0" />
+                    <TextBox x:Name="txtFileNum" VerticalAlignment="Center" Grid.Column="1" Text="1" />
 
                     <Label Content="Record Number" VerticalAlignment="Center" Grid.Row="1" />
                     <TextBox x:Name="txtRecNum" VerticalAlignment="Center" Grid.Column="1" Grid.Row="1" Text="0" TextChanged="txtRecNum_TextChanged" />
@@ -189,7 +209,25 @@
             </TabItem>
         </TabControl>
 
-        <StatusBar Grid.Row="3">
+        <Expander x:Name="logExpander" Grid.Row="4" Header="Activity log" IsExpanded="False" Margin="5,2"
+                  Expanded="LogExpanded" Collapsed="LogCollapsed">
+            <Grid Height="190">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel Margin="0,4,0,4">
+                    <Button Content="Clear" Width="60" Margin="0,0,6,0" Click="ClearLogClick" />
+                    <Button Content="Save…" Width="60" Margin="0,0,10,0" Click="SaveLogClick" />
+                    <TextBlock Text="Latest 1000 log4net events" Foreground="DimGray" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBox x:Name="txtActivityLog" Grid.Row="1" IsReadOnly="True" AcceptsReturn="True"
+                         FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+            </Grid>
+        </Expander>
+
+        <StatusBar Grid.Row="5">
             <StatusBarItem x:Name="lblStatus" Content="Disconnected" VerticalAlignment="Center" />
             <StatusBarItem VerticalAlignment="Center" HorizontalAlignment="Right">
                 <Grid>

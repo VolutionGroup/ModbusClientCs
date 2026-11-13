@@ -27,7 +27,7 @@ namespace VVG.Modbus.ClientTest
     public partial class MainWindow : Window
     {
         private static readonly ILog _log = LogManager.GetLogger(typeof(MainWindow));
-        private ClientSlave _slave = new ClientSlave();
+        private ClientSlave _slave = new ClientSlave((IClient)null, 1);
         private SerialPort _serialPort = null;
         private TcpClient _tcpClient = null;
 
@@ -39,6 +39,7 @@ namespace VVG.Modbus.ClientTest
         public MainWindow()
         {
             InitializeComponent();
+            InitialiseMonitoring();
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -50,6 +51,8 @@ namespace VVG.Modbus.ClientTest
             UpdateDiscreteInputs(null, 0);
             UpdateHoldingRegisters(null, 0);
             UpdateInputRegisters(null, 0);
+
+            UpdateConnected();
 
             Title += String.Format(" - V{0}", System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
         }
@@ -181,6 +184,7 @@ namespace VVG.Modbus.ClientTest
 
         private void UpdateConnected()
         {
+            _connectionGeneration++;
             bool serialOpen = ((_serialPort != null) && (_serialPort.IsOpen));
             bool tcpOpen = ((_tcpClient != null) && (_tcpClient.Connected));
             
@@ -193,6 +197,8 @@ namespace VVG.Modbus.ClientTest
             txtSlaveID.IsEnabled = !(serialOpen || tcpOpen);
             cmdDisconnectTCP.IsEnabled = tcpOpen;
             cmdConnectTCP.IsEnabled = !(serialOpen || tcpOpen);
+            UpdateOperationControls();
+            ScheduleNextRefresh();
         }
         #endregion
 
@@ -200,19 +206,21 @@ namespace VVG.Modbus.ClientTest
         {
             try
             {
+                TimeSpan timeout = GetCommandTimeout();
                 _serialPort = new SerialPort((string)cboSerialPort.SelectedItem)
                 {
                     BaudRate = int.Parse(txtBaudRate.Text),
                     Parity = (Parity)Enum.Parse(typeof(Parity), (string)cboParity.SelectedItem)
                 };
                 _serialPort.Open();
-                _slave.Client = new ClientRTU(_serialPort);
+                _slave.Client = new ClientRTU(_serialPort) { Timeout = timeout, AllowExtendedFileRecordAddresses = true };
 
                 _log.InfoFormat("Connected to {0} @ {1}/{2}", cboSerialPort.SelectedItem, txtBaudRate.Text, cboParity.SelectedItem);
                 UpdateConnected();
             }
             catch (Exception ex)
             {
+                _log.Error("Operation failed", ex);
                 MessageBox.Show("Failed to open serial port: " + ex.Message, "Connection failure");
             }
         }
@@ -243,202 +251,66 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdReadFile_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 fileNum, recNum;
-            int len;
-            if (false == UInt16.TryParse(txtFileNum.Text, out fileNum))
-            {
-                MessageBox.Show("Failed to parse File Number", "Fail");
-                return;
-            }
-            if (false == UInt16.TryParse(txtRecNum.Text, out recNum))
-            {
-                MessageBox.Show("Failed to parse Record Number", "Fail");
-                return;
-            }
-            if (false == int.TryParse(txtLen.Text, out len))
-            {
-                MessageBox.Show("Failed to parse Length (bytes)", "Fail");
-                return;
-            }
-            if (len > UInt16.MaxValue * 2)
-            {
-                MessageBox.Show("Length exceeds maximum of " + (UInt16.MaxValue * 2) + " bytes", "Fail");
-                return;
-            }
-
-            if (File.Exists(txtFilename.Text))
-            {
-                if (MessageBox.Show("File already exists - do you want to overwrite?", "File exists", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                {
-                    return;
-                }
-            }
-
-            _log.InfoFormat("Beginning File {0} read from record {1}, of {2} bytes", fileNum, recNum, len);
-
-            var readFile = new byte[len];
-            int retries = 0;
-            
-            for (int i = 0; i < len;)
-            {
-                int remaining = len - i;
-
-                // Limit to 128 bytes per request
-                UInt16 thisLen = (UInt16)((remaining > 128) ? 128 : remaining);
-
-                byte[] readRecs;
-                try
-                {
-                    readRecs = await _slave.ReadFileRecord(fileNum, recNum, thisLen);
-                }
-                catch (Exception ex)
-                {
-                    _log.ErrorFormat("Read request failed at {0}/{1} (attempt {2}) - exception {3}", i, len, retries, ex);
-                    if (++retries > 5)
-                    {
-                        MessageBox.Show(String.Format("Failed to read file (retries exhausted).\n\nProgress {0}/{1} bytes.\n\nLast exception: {2}", i, len, ex), "Fail");
-                        return;
-                    }
-                    continue;
-                }
-
-                if (readRecs.Length == thisLen)
-                {
-                    Array.Copy(readRecs, 0, readFile, i, thisLen);
-                    i += thisLen;
-                    recNum += (UInt16)(thisLen / 2);    // Records are multiples of UInt16
-                    retries = 0;
-                }
-
-                UpdateProgress(100.0f * i / len);
-            }
-
-            _log.Info("File read complete");
-            
-            try
-            {
-                File.WriteAllBytes(txtFilename.Text, readFile);
-                MessageBox.Show("File received and saved OK", "Success");
-            }
-            catch (Exception ex)
-            {
-                _log.Error("Failed to write to file", ex);
-                MessageBox.Show("Modbus transfer successful but failed to write file locally: " + ex.Message, "Fail");
-            }
+            await RunUiOperationAsync(() => TransferFileAsync(false), false, "File read failed");
         }
 
         private async void cmdWriteFile_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 fileNum, ui16;
-            int len, recNum; // need to be > UInt16 now we're allowing for roll-over
-            if (false == UInt16.TryParse(txtFileNum.Text, out fileNum))
+            await RunUiOperationAsync(() => TransferFileAsync(true), false, "File write failed");
+        }
+
+        private async Task TransferFileAsync(bool writing)
+        {
+            ushort fileNumber;
+            ushort recordNumber;
+            int length;
+            if (!ushort.TryParse(txtFileNum.Text, out fileNumber) || fileNumber == 0)
+                throw new ArgumentException("Enter a file number from 1 to 65535.");
+            if (!ushort.TryParse(txtRecNum.Text, out recordNumber))
+                throw new ArgumentException("Enter a record number from 0 to 65535.");
+            if (!int.TryParse(txtLen.Text, out length) || length <= 0)
+                throw new ArgumentException("Enter a positive transfer length in bytes.");
+            string filename = txtFilename.Text;
+            if (string.IsNullOrWhiteSpace(filename)) throw new ArgumentException("Choose a local filename.");
+            byte[] data;
+            if (writing)
             {
-                MessageBox.Show("Failed to parse File Number", "Fail");
-                return;
-            }
-            if (UInt16.TryParse(txtRecNum.Text, out ui16))
-            {
-                recNum = ui16;
+                data = File.ReadAllBytes(filename);
+                if (length > data.Length)
+                {
+                    if (MessageBox.Show("The file has fewer bytes than requested. Use its actual size?", "File size",
+                        MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                    length = data.Length;
+                    txtLen.Text = length.ToString();
+                }
+                if (length <= 0 || length % 2 != 0)
+                    throw new ArgumentException("File writes require a positive, even number of bytes.");
+                if (data.Length != length) Array.Resize(ref data, length);
             }
             else
             {
-                MessageBox.Show("Failed to parse Record Number", "Fail");
-                return;
+                if (File.Exists(filename) && MessageBox.Show("File already exists. Overwrite it?", "File exists",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                data = null;
             }
-            if (false == int.TryParse(txtLen.Text, out len))
-            {
-                MessageBox.Show("Failed to parse Length (bytes)", "Fail");
-                return;
-            }
-            
-            if (false == File.Exists(txtFilename.Text))
-            {
-                MessageBox.Show("File does not exist - cannot send file", "Fail");
-                return;
-            }
-
-            byte[] fileBytes = File.ReadAllBytes(txtFilename.Text);
-            
-            if (fileBytes.Length < len)
-            {
-                if (MessageBox.Show("Insufficient bytes in file for requested send size - update to match file size?", "Size mis-match", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                {
-                    return;
-                }
-                len = (UInt16)fileBytes.Length;
-                await Dispatcher.BeginInvoke(new Action(() => txtLen.Text = len.ToString()));
-            }
-            if (len > UInt16.MaxValue * 2)
-            {
-                // TODO - also take into account starting offset
-                int split = len / (UInt16.MaxValue * 2);
-                if (len % (UInt16.MaxValue * 2) > 0)
-                {
-                    split++;
-                }
-                if (MessageBox.Show(String.Format("Length exceeds maximum of {0} bytes\n\nSplit over {1} file IDs?", UInt16.MaxValue * 2, split),
-                    "That's larger than expected", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
-                {
-                    return;
-                }
-            }
-
-            _log.InfoFormat("Beginning File {0} write from record {1}, of {2} bytes", fileNum, recNum, len);
-
-            int retries = 0;
-
-            for (int i = 0; i < len;)
-            {
-                UpdateProgress(100.0f * i / len);
-
-                int remaining = (len - i);
-
-                // Limit to 128 bytes per request
-                int thisWriteLen = (remaining > 128) ? 128 : remaining;
-                if (recNum + (thisWriteLen / 2) > UInt16.MaxValue)
-                {
-                    thisWriteLen = (UInt16.MaxValue + 1 - recNum) * 2; // limit to max record size
-                    _log.InfoFormat("Restricting write to {0} bytes to avoid overlap to next FileID", thisWriteLen);
-                }
-                var writeRecs = new byte[thisWriteLen];
-                Array.Copy(fileBytes, i, writeRecs, 0, writeRecs.Length);
-                try
-                {
-                    await _slave.WriteFileRecord(fileNum, (UInt16)recNum, writeRecs);
-                }
-                catch (Exception ex)
-                {
-                    _log.ErrorFormat("Write request failed at {0}/{1} (attempt {2}) - exception {3}", i, len, retries, ex);
-                    if (++retries > 10)
-                    {
-                        if (MessageBox.Show(String.Format("Retries exhausted trying to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}\n\n\nAttempt to continue?",
-                            i, len, ex), "File transfer issue", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
-                        {
-                            retries = 0;
-                            continue;
-                        }
-                        MessageBox.Show(String.Format("Failed to write file.\n\nProgress {0}/{1} records.\n\nLast exception: {2}", i, len, ex), "Fail");
-                        return;
-                    }
-                    Thread.Sleep(250);
-                    continue;
-                }
-
-                i += writeRecs.Length;
-                recNum += writeRecs.Length / 2;
-                retries = 0;
-
-                if (recNum > UInt16.MaxValue)
-                {
-                    _log.InfoFormat("FileID {0} length exceeded, wrapping to next", fileNum);
-                    fileNum++;
-                    recNum = 0; // wrap around
-                }
-            }
-
-            UpdateProgress(100);
-            _log.Info("File sent OK");
-            MessageBox.Show("File sent OK", "Success");
+            var position = new FileTransferPosition(fileNumber, recordNumber, length);
+            if (position.AdditionalFiles > 0 && MessageBox.Show(string.Format(
+                "This transfer crosses a 128 KiB file boundary. Continue across {0} adjacent file ID(s), ending at file {1}?",
+                position.AdditionalFiles, fileNumber + position.AdditionalFiles), "Adjacent files",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            if (data == null) data = new byte[length];
+            var slave = new ClientSlave(_slave.Client, _slave.Address);
+            _log.InfoFormat("Starting file {0}: {1} bytes from file {2}, record {3}",
+                writing ? "write" : "read", length, fileNumber, recordNumber);
+            bool completed = await FileTransferRunner.RunAsync(slave, data, position, writing,
+                (exception, failed) => Task.FromResult(!_closing && MessageBox.Show(string.Format(
+                    "Retries exhausted during file {0}.\n\nProgress: {1}/{2} bytes. File {3}, record {4}.\n\n{5}\n\nAttempt to continue from this position?",
+                    writing ? "write" : "read", failed.Offset, failed.Length, failed.FileNumber,
+                    failed.RecordNumber, ErrorText(exception)), "File transfer issue",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes), UpdateProgress);
+            if (!completed || _closing) return;
+            if (!writing) File.WriteAllBytes(filename, data);
+            MessageBox.Show(writing ? "File sent OK" : "File received and saved OK", "Success");
         }
 
         private void txtRecNum_TextChanged(object sender, TextChangedEventArgs e)
@@ -491,7 +363,7 @@ namespace VVG.Modbus.ClientTest
         {
             var tb = (TextBox)sender;
             int len;
-            if (int.TryParse(tb.Text, out len) && (len > 0) && (len < UInt16.MaxValue * 2))
+            if (int.TryParse(tb.Text, out len) && (len > 0))
             {
                 tb.Background = Brushes.LightGreen;
             }
@@ -521,33 +393,15 @@ namespace VVG.Modbus.ClientTest
 
         private async void cmdReadCoils_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 coilStartNo, len;
-            if (false == UInt16.TryParse(txtStartingCoil.Text, out coilStartNo))
-            {
-                MessageBox.Show("Could not parse starting coil", "Fail");
-                return;
-            }
-            if (false == UInt16.TryParse(txtNumCoils.Text, out len))
-            {
-                MessageBox.Show("Could not parse number of coils", "Fail");
-                return;
-            }
-
-            IEnumerable<bool> coils;
-            try
-            {
-                coils = await _slave.ReadCoils(coilStartNo, len);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed to read coils: " + ex.Message, "Fail");
-                return;
-            }
-
-            UpdateCoils(coils, coilStartNo);
+            await RefreshTabAsync(0, false);
         }
 
         private async void cmdWriteCoils_Click(object sender, RoutedEventArgs e)
+        {
+            await RunUiOperationAsync(WriteCoilsAsync, false, "Write command failed");
+        }
+
+        private async Task WriteCoilsAsync()
         {
             if (_coils.Count() < 1)
             {
@@ -562,6 +416,7 @@ namespace VVG.Modbus.ClientTest
                 }
                 catch (Exception ex)
                 {
+                    _log.Error("Write failed", ex);
                     MessageBox.Show("Failed to write coil: " + ex.Message, "Fail");
                     return;
                 }
@@ -582,6 +437,7 @@ namespace VVG.Modbus.ClientTest
                 }
                 catch (Exception ex)
                 {
+                    _log.Error("Write failed", ex);
                     MessageBox.Show("Failed to write coils: " + ex.Message, "Fail");
                     return;
                 }
@@ -592,32 +448,9 @@ namespace VVG.Modbus.ClientTest
                 
         private async void cmdReadDIs_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 startNo, len;
-            if (false == UInt16.TryParse(txtStartingDI.Text, out startNo))
-            {
-                MessageBox.Show("Could not parse starting DI", "Fail");
-                return;
-            }
-            if (false == UInt16.TryParse(txtNumDIs.Text, out len))
-            {
-                MessageBox.Show("Could not parse number of DIs", "Fail");
-                return;
-            }
-
-            IEnumerable<bool> values;
-            try
-            {
-                values = await _slave.ReadDiscreteInputs(startNo, len);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed to read discrete inputs: " + ex.Message, "Fail");
-                return;
-            }
-
-            UpdateDiscreteInputs(values, startNo);
+            await RefreshTabAsync(1, false);
         }
-        
+
         private void cmdUpdateHRs_Click(object sender, RoutedEventArgs e)
         {
             UInt16 startNo, len;
@@ -638,33 +471,15 @@ namespace VVG.Modbus.ClientTest
         
         private async void cmdReadHRs_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 startNo, len;
-            if (false == UInt16.TryParse(txtStartingHR.Text, out startNo))
-            {
-                MessageBox.Show("Could not parse starting HR", "Fail");
-                return;
-            }
-            if (false == UInt16.TryParse(txtNumHRs.Text, out len))
-            {
-                MessageBox.Show("Could not parse number of HRs", "Fail");
-                return;
-            }
-
-            IEnumerable<UInt16> values;
-            try
-            {
-                values = await _slave.ReadHoldingRegisters(startNo, len);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed to read holding registers: " + ex.Message, "Fail");
-                return;
-            }
-
-            UpdateHoldingRegisters(values, startNo);
+            await RefreshTabAsync(2, false);
         }
 
         private async void cmdWriteHRs_Click(object sender, RoutedEventArgs e)
+        {
+            await RunUiOperationAsync(WriteHoldingRegistersAsync, false, "Write command failed");
+        }
+
+        private async Task WriteHoldingRegistersAsync()
         {
             if (_holdingRegisters.Count() < 1)
             {
@@ -679,6 +494,7 @@ namespace VVG.Modbus.ClientTest
                 }
                 catch (Exception ex)
                 {
+                    _log.Error("Write failed", ex);
                     MessageBox.Show("Failed to write holding register: " + ex.Message, "Fail");
                     return;
                 }
@@ -699,6 +515,7 @@ namespace VVG.Modbus.ClientTest
                 }
                 catch (Exception ex)
                 {
+                    _log.Error("Write failed", ex);
                     MessageBox.Show("Failed to write holding registers: " + ex.Message, "Fail");
                     return;
                 }
@@ -709,46 +526,25 @@ namespace VVG.Modbus.ClientTest
         
         private async void cmdReadIRs_Click(object sender, RoutedEventArgs e)
         {
-            UInt16 startNo, len;
-            if (false == UInt16.TryParse(txtStartingIR.Text, out startNo))
-            {
-                MessageBox.Show("Could not parse starting IR", "Fail");
-                return;
-            }
-            if (false == UInt16.TryParse(txtNumIRs.Text, out len))
-            {
-                MessageBox.Show("Could not parse number of IRs", "Fail");
-                return;
-            }
-
-            IEnumerable<UInt16> values;
-            try
-            {
-                values = await _slave.ReadInputRegisters(startNo, len);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed to read input registers: " + ex.Message, "Fail");
-                return;
-            }
-
-            UpdateInputRegisters(values, startNo);
+            await RefreshTabAsync(3, false);
         }
 
         private void cmdConnectTCP_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                TimeSpan timeout = GetCommandTimeout();
                 _tcpClient = new TcpClient();
                 _tcpClient.Connect(txtIpHost.Text, int.Parse(txtPort.Text));
-                _slave.Client = new ClientTCP_RTU(_tcpClient);
+                _slave.Client = new ClientTCP_RTU(_tcpClient) { Timeout = timeout, AllowExtendedFileRecordAddresses = true };
 
-                _log.InfoFormat("Connected to {0} @ {1}/{2}", cboSerialPort.SelectedItem, txtBaudRate.Text, cboParity.SelectedItem);
+                _log.InfoFormat("Connected to {0}:{1} (RTU over TCP)", txtIpHost.Text, txtPort.Text);
                 UpdateConnected();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Failed to open serial port: " + ex.Message, "Connection failure");
+                _log.Error("Operation failed", ex);
+                MessageBox.Show("Failed to open TCP connection: " + ex.Message, "Connection failure");
             }
         }
 
@@ -758,7 +554,7 @@ namespace VVG.Modbus.ClientTest
             _tcpClient = null;
             _slave.Client = null;
 
-            _log.Info("COM port disconnected");
+            _log.Info("TCP connection disconnected");
             UpdateConnected();
         }
     }
