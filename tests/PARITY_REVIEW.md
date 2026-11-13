@@ -14,7 +14,7 @@ The C# checkout already had uncommitted changes to `ClientRTU_Base.cs`, chiefly
 corrected coil/file writes and a register-echo loop fix. Those changes were used
 as the baseline and preserved. In particular, `WriteCoils()` and
 `WriteFileRecord()` were retained byte-for-byte from the existing working copy.
-No commits, pushes or package-version changes are part of this parity update.
+No package-version changes are part of this parity update.
 
 ## Fix comparison
 
