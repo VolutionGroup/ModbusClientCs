@@ -76,7 +76,7 @@ def main():
     package = output / "_package"
     package.mkdir()
     shutil.copy2(build / "VVG.Modbus.dll", package / "VVG.Modbus.dll")
-    shutil.copy2(repo / "LICENSE", package / "LICENSE")
+    shutil.copy2(repo / "LICENSE", package / "LICENSE.txt")
     shutil.copy2(repo / "README.md", package / "README.md")
     namespace = "http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd"
     ET.register_namespace("", namespace)
@@ -86,18 +86,24 @@ def main():
     raw_version = metadata.find(q("version")).text
     parts = raw_version.split(".")
     package_version = ".".join(parts[:3]) if len(parts) == 4 and parts[3] == "0" else raw_version
-    ET.SubElement(metadata, q("license"), {"type": "file"}).text = "LICENSE"
+    ET.SubElement(metadata, q("license"), {"type": "expression"}).text = "MIT"
     ET.SubElement(metadata, q("readme")).text = "README.md"
     ET.SubElement(metadata, q("repository"), {"type": "git", "url": "https://github.com/VolutionGroup/ModbusClientCs", "commit": commit})
     ET.SubElement(metadata, q("releaseNotes")).text = "Bounds-first response validation, corrected coil encoding and opt-in extended file-record addresses. See GitHub release notes for compatibility changes."
     files = ET.SubElement(spec.getroot(), q("files"))
-    for source, target in (("VVG.Modbus.dll", "lib/net48"), ("LICENSE", ""), ("README.md", "")):
-        ET.SubElement(files, q("file"), {"src": source, "target": target})
+    for source, target in (("VVG.Modbus.dll", "lib/net48/VVG.Modbus.dll"),
+                           ("LICENSE.txt", "LICENSE.txt"), ("README.md", "README.md")):
+        ET.SubElement(files, q("file"), {"src": str(package / source), "target": target})
+    # Emit a modern standalone manifest; all explicit file paths are absolute.
+    for element in spec.getroot().iter():
+        element.tag = element.tag.rsplit("}", 1)[-1]
     spec_path = package / "VVG.Modbus.nuspec"
     spec.write(spec_path, encoding="utf-8", xml_declaration=True)
     execute([nuget, "pack", spec_path, "-OutputDirectory", output, "-NonInteractive"], repo)
     nupkg = output / ("VVG.Modbus." + package_version + ".nupkg")
     with zipfile.ZipFile(nupkg) as archive:
+        if not {"lib/net48/VVG.Modbus.dll", "LICENSE.txt", "README.md"}.issubset(archive.namelist()):
+            raise RuntimeError("NuGet package is missing a required distribution file")
         if hashlib.sha256(archive.read("lib/net48/VVG.Modbus.dll")).hexdigest() != digest(build / "VVG.Modbus.dll"):
             raise RuntimeError("Packaged library differs from the client release library")
     distribution = output / ("VVG.Modbus.ClientTest_" + tag + ".zip")
