@@ -1,4 +1,4 @@
-﻿using log4net;
+using log4net;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,12 +12,16 @@ namespace VVG.Modbus
     public abstract class ClientRTU_Base : IClient
     {
         protected abstract Task<byte[]> CommsReceive(int count);
+        /// <summary>Send the complete frame, throwing on transmission failure.</summary>
+        /// <remarks>A successful return must not represent a failed or partial send.</remarks>
         protected abstract void CommsSend(byte[] data);
         public abstract bool IsConnected { get; }
         public abstract TimeSpan Timeout { get; set; }
 
         protected static readonly ILog _log = LogManager.GetLogger(typeof(ClientRTU_Base));
 
+        // Slave addresses pass through unless a specific operation validates them.
+        // Existing FC15/21 address and broadcast policies are retained.
         // N.B. Address 0001 = register 0000 (address range SHOULD be 0001..9999 but some devices go full 0x0000..0xffff)
         //const UInt16 MAX_REG_NO = 9998;
 
@@ -117,9 +121,9 @@ namespace VVG.Modbus
             //{
             //    throw new ArgumentException("Illegal coilStartNo", "coilStartNo");
             //}
-            if (len > maxCoilRead)
+            if ((0 == len) || (len > maxCoilRead))
             {
-                throw new ArgumentException("Too many coils requested", "len");
+                throw new ArgumentOutOfRangeException(nameof(len), "Coil count is outside the supported non-empty range.");
             }
 
             byte[] txData = new byte[READ_COILS_TX_LEN];
@@ -151,23 +155,8 @@ namespace VVG.Modbus
             }
             finally { _semaphore.Release(); }
 
-            // Check the length and header
-            if ((rxData.Length != expectedLen)
-                || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.ReadCoils)
-                || (rxData[2] != expectedDataCount))
-            {
-                throw new ModbusException(rxData);
-            }
-
-            // Check the CRC
-            crc = Crc16.Calc(rxData, expectedDataCount + 3);
-            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
-                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
-            {
-                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
-                throw new ModbusException("CRC failure");
-            }
+            ValidateReadHeader(rxData, expectedLen, addr, ModbusCommands.ReadCoils, expectedDataCount);
+            ValidateReadCrc(rxData, expectedLen);
 
             // Populate the return buffer
             byte bufferIdx = 3;
@@ -215,9 +204,9 @@ namespace VVG.Modbus
             //{
             //    throw new ArgumentException("Discrete inputs out of range requested", "inputStartNo");
             //}
-            if (len > maxCoilRead)
+            if ((0 == len) || (len > maxCoilRead))
             {
-                throw new ArgumentException("Too many discrete inputs requested", "len");
+                throw new ArgumentOutOfRangeException(nameof(len), "Discrete-input count is outside the supported non-empty range.");
             }
 
             byte[] txData = new byte[READ_DI_TX_LEN];
@@ -249,23 +238,8 @@ namespace VVG.Modbus
             }
             finally { _semaphore.Release(); }
 
-            // Check the length and header
-            if ((rxData.Length != expectedLen)
-                || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.ReadDiscreteInput)
-                || (rxData[2] != expectedDataCount))
-            {
-                throw new ModbusException(rxData);
-            }
-
-            // Check the CRC
-            crc = Crc16.Calc(rxData, expectedDataCount + 3);
-            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
-                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
-            {
-                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
-                throw new ModbusException("CRC failure");
-            }
+            ValidateReadHeader(rxData, expectedLen, addr, ModbusCommands.ReadDiscreteInput, expectedDataCount);
+            ValidateReadCrc(rxData, expectedLen);
 
             // Populate the return buffer
             byte bufferIdx = 3;
@@ -314,9 +288,9 @@ namespace VVG.Modbus
             //{
             //    throw new ArgumentException("Illegal holiding register requested", "regStartNo");
             //}
-            if (len > maxRegsRead)
+            if ((0 == len) || (len > maxRegsRead))
             {
-                throw new ArgumentException("Too many holding registers requested", "len");
+                throw new ArgumentOutOfRangeException(nameof(len), "Register count is outside the supported non-empty range.");
             }
 
             byte[] txData = new byte[READ_HR_TX_LEN];
@@ -343,20 +317,8 @@ namespace VVG.Modbus
             }
             finally { _semaphore.Release(); }
 
-            if ((rxData.Length != expectedLen)
-                || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.ReadHoldingRegisters))
-            {
-                throw new ModbusException(rxData);
-            }
-
-            crc = Crc16.Calc(rxData, rxData[2] + 3);
-            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
-                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
-            {
-                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
-                throw new ModbusException("CRC failure");
-            }
+            ValidateReadHeader(rxData, expectedLen, addr, ModbusCommands.ReadHoldingRegisters, len * 2);
+            ValidateReadCrc(rxData, expectedLen);
 
             var values = new List<UInt16>();
             for (UInt16 i = 0; i < len; i++)
@@ -397,6 +359,11 @@ namespace VVG.Modbus
             //    throw new ArgumentException();
             //}
 
+            if ((0 == len) || (len > maxRegsRead))
+            {
+                throw new ArgumentOutOfRangeException(nameof(len));
+            }
+
             byte[] txData = new byte[READ_IR_TX_LEN];
             txData[0] = addr;
             txData[1] = (byte)ModbusCommands.ReadInputRegisters;
@@ -420,20 +387,8 @@ namespace VVG.Modbus
             }
             finally { _semaphore.Release(); }
 
-            if ((rxData.Length != expectedLen)
-                || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.ReadInputRegisters))
-            {
-                throw new ModbusException(rxData);
-            }
-
-            crc = Crc16.Calc(rxData, rxData[2] + 3);
-            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
-                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
-            {
-                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
-                throw new ModbusException("CRC failure");
-            }
+            ValidateReadHeader(rxData, expectedLen, addr, ModbusCommands.ReadInputRegisters, len * 2);
+            ValidateReadCrc(rxData, expectedLen);
 
             var values = new List<UInt16>();
             for (UInt16 i = 0; i < len; i++)
@@ -563,84 +518,81 @@ namespace VVG.Modbus
         /// <param name="txCoils">Coil values to write</param>
         public async Task WriteCoils(byte addr, UInt16 coilStartNo, bool[] txCoils)
         {
-            // TODO - make dynamic
-            byte[] txData = new byte[250];
-            int maxCoilWrite = (txData.Length - WRITE_COILS_TX_OVERHEAD) * 8;
-
-            //if ( ((coilStartNo + txCoils.Length - 1) > MAX_REG_NO) || (txCoils.Length > maxCoilWrite) )
-            if (txCoils.Length > maxCoilWrite)
+            if (addr > 247)
             {
-                throw new ArgumentException("Length too long");
+                throw new ArgumentOutOfRangeException(nameof(addr));
+            }
+            if (txCoils == null)
+            {
+                throw new ArgumentNullException(nameof(txCoils));
+            }
+            if ((txCoils.Length == 0) || (txCoils.Length > 1968))
+            {
+                throw new ArgumentOutOfRangeException(nameof(txCoils));
+            }
+            if ((int)coilStartNo + txCoils.Length > 65536)
+            {
+                throw new ArgumentOutOfRangeException(nameof(coilStartNo));
             }
 
-            // Prepare the header
+            int dataLength = (txCoils.Length + 7) / 8;
+            byte[] txData = new byte[WRITE_COILS_TX_OVERHEAD + dataLength];
+
             txData[0] = addr;
             txData[1] = (byte)ModbusCommands.WriteCoils;
-            txData[2] = (byte)((coilStartNo & 0xFF00) >> 8);
-            txData[3] = (byte)(coilStartNo & 0x00FF);
-            txData[4] = (byte)((txCoils.Length & 0xFF00) >> 8);
-            txData[5] = (byte)(txCoils.Length & 0x00FF);
-            // txData[6] to be filled with number of bytes after filling the buffer
+            txData[2] = (byte)(coilStartNo >> 8);
+            txData[3] = (byte)coilStartNo;
+            txData[4] = (byte)(txCoils.Length >> 8);
+            txData[5] = (byte)txCoils.Length;
+            txData[6] = (byte)dataLength;
 
-            // Populate the txCoils on to the transmit buffer
-            byte txLen = 7;
-            txData[txLen] = 0;
-            byte bitPos = 0;
-            for (UInt16 i = 0; i < txCoils.Length; i++)
+            for (int i = 0; i < txCoils.Length; i++)
             {
-                txData[txLen] <<= 1;
                 if (txCoils[i])
                 {
-                    txData[txLen] |= 1;
-                }
-
-                if (++bitPos >= 8)
-                {
-                    bitPos = 0;
-                    txLen++;
-                    txData[txLen] = 0;
+                    txData[7 + (i / 8)] |= (byte)(1 << (i % 8));
                 }
             }
 
-            txData[6] = (byte)(txLen - 6);
+            UInt16 crc = Crc16.Calc(txData, txData.Length - 2);
+            txData[txData.Length - 2] = (byte)crc;
+            txData[txData.Length - 1] = (byte)(crc >> 8);
 
-            UInt16 crc = Crc16.Calc(txData, txLen);
-            txData[txLen++] = (byte)(crc & 0x00FF);
-            txData[txLen++] = (byte)((crc & 0xFF00) >> 8);
-            Array.Resize(ref txData, txLen);
-
-            byte[] rxData = null;
+            byte[] rxData;
             await _semaphore.WaitAsync();
             try
             {
-                _log.DebugFormat("Writing {0} coils from {1}@{2}", txCoils.Length, coilStartNo, addr);
                 CommsSend(txData);
+                if (addr == 0)
+                {
+                    return;
+                }
+
                 rxData = await CommsReceive(WRITE_COILS_RX_LEN);
             }
-            finally { _semaphore.Release(); }
+            finally
+            {
+                _semaphore.Release();
+            }
 
             if (rxData.Length != WRITE_COILS_RX_LEN)
             {
                 throw new ModbusException(rxData);
             }
 
-            // Verify echo-back (excl. CRC)
-            for (int i = 0; i < rxData.Length - 2; i++)
+            for (int i = 0; i < WRITE_COILS_RX_LEN - 2; i++)
             {
                 if (txData[i] != rxData[i])
                 {
-                    _log.ErrorFormat("Read-back failed @ {0} - 0x{1:X2} != 0x{2:X2}", i, txData[i], rxData[i]);
                     throw new ModbusException("Echo-back verification failed");
                 }
             }
 
-            // Verify CRC
             crc = Crc16.Calc(rxData, rxData.Length - 2);
-            if (((crc & 0x00FF) != rxData[rxData.Length - 2])
-                || (((crc & 0xFF00) >> 8) != rxData[rxData.Length - 1]))
+            if (((byte)crc != rxData[rxData.Length - 2])
+                || ((byte)(crc >> 8) != rxData[rxData.Length - 1]))
             {
-                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData.Length - 1], rxData[rxData.Length - 2]);
-                throw new ModbusException("CRC fail");
+                throw new ModbusException("CRC failure");
             }
 
             _log.Debug("Coils written OK");
@@ -654,6 +606,10 @@ namespace VVG.Modbus
         /// <param name="txRegs">Register values to write</param>
         public async Task WriteHoldingRegisters(byte addr, UInt16 regStartNo, UInt16[] txRegs)
         {
+            if (null == txRegs)
+            {
+                throw new ArgumentNullException(nameof(txRegs));
+            }
             // TODO make this dynamic
             byte[] txData = new byte[250];
             int maxRegWrite = (txData.Length - WRITE_HRS_TX_OVERHEAD) / 2;
@@ -703,7 +659,7 @@ namespace VVG.Modbus
             }
 
             // Verify echo-back (excl. CRC)
-            for (int i = 0; i < WRITE_HRS_RX_LEN - 2; i++)
+            for (int i = 0; i < rxData.Length - 2; i++)
             {
                 if (txData[i] != rxData[i])
                 {
@@ -731,16 +687,20 @@ namespace VVG.Modbus
         /// <param name="fileNo">File number to read from</param>
         /// <param name="recNo">Record number(uint16 offset) in the file</param>
         /// <param name="len">Length(in bytes) to read</param>
-        /// <returns>Records read from file</returns>
+        /// <returns>Exactly len bytes; an odd request reads a padded word but omits the padding byte.</returns>
         public async Task<byte[]> ReadFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, UInt16 len)
         {
             byte[] txData = new byte[READ_FILE_RECORD_TX_LEN];
 
-            if ((len % 2) > 0)
+            // Use the same approximately 250-byte transaction budget as the other reads.
+            // Rounded data plus the two subresponse header bytes must also fit 0xF5.
+            const int MAX_FILE_READ_BYTES = 242;
+            if ((0 == len) || (len > MAX_FILE_READ_BYTES))
             {
-                // Needs to be a whole number of UInt16
-                len++;
+                throw new ArgumentOutOfRangeException(nameof(len));
             }
+            int requestedLength = len;
+            int recordBytes = requestedLength + (requestedLength % 2);
 
             // Form the request
             txData[0] = addr;
@@ -751,14 +711,14 @@ namespace VVG.Modbus
             txData[5] = (byte)(fileNo & 0x00FF);
             txData[6] = (byte)((recNo & 0xFF00) >> 8);
             txData[7] = (byte)(recNo & 0x00FF);
-            txData[8] = (byte)(((len / 2) & 0xFF00) >> 8);
-            txData[9] = (byte)((len / 2) & 0x00FF);  // record length = byte length / 2
+            txData[8] = (byte)(((recordBytes / 2) & 0xFF00) >> 8);
+            txData[9] = (byte)((recordBytes / 2) & 0x00FF);  // record length = byte length / 2
 
             UInt16 crc = Crc16.Calc(txData, 10);
             txData[10] = (byte)(crc & 0x00FF);
             txData[11] = (byte)((crc & 0xFF00) >> 8);
 
-            int expectedLen = (READ_FILE_RECORD_RX_OVERHEAD + len);
+            int expectedLen = (READ_FILE_RECORD_RX_OVERHEAD + recordBytes);
 
             byte[] rxData = null;
             await _semaphore.WaitAsync();
@@ -773,29 +733,19 @@ namespace VVG.Modbus
             }
             finally { _semaphore.Release(); }
 
-            // Validate the response
-            // TODO - verify record response length and reference type
-            if ((rxData.Length < expectedLen) // may be 1 greater if odd number
-                || (rxData[0] != addr)
-                || (rxData[1] != (byte)ModbusCommands.ReadFileRecords))
+            ValidateReadHeader(rxData, expectedLen, addr, ModbusCommands.ReadFileRecords,
+                               recordBytes + READ_FILE_RECORD_SUBREC_RES_LEN);
+            if ((rxData[3] != (recordBytes + 1)) || (rxData[4] != 6))
             {
                 throw new ModbusException(rxData);
             }
-
-            crc = Crc16.Calc(rxData, rxData[2] + 3);
-            if (((crc & 0x00FF) != rxData[rxData[2] + 3])
-                || (((crc & 0xFF00) >> 8) != rxData[rxData[2] + 4]))
-            {
-                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}", crc, rxData[rxData[2] + 4], rxData[rxData[2] + 3]);
-                throw new ModbusException("CRC failure");
-            }
+            ValidateReadCrc(rxData, expectedLen);
 
             // Copy the record data back to the passed buffer
-            // TODO - verify record response length and reference type
-            var rxRecs = new byte[len];
-            Array.Copy(rxData, READ_FILE_RECORD_RX_OVERHEAD - 2, rxRecs, 0, len);
+            var rxRecs = new byte[requestedLength];
+            Array.Copy(rxData, READ_FILE_RECORD_RX_OVERHEAD - 2, rxRecs, 0, requestedLength);
 
-            _log.DebugFormat("Read {0} bytes", len);
+            _log.DebugFormat("Read {0} bytes", requestedLength);
             return rxRecs;
         }
 
@@ -808,61 +758,108 @@ namespace VVG.Modbus
         /// <param name="txFileRecs">Records to write to file</param>
         public async Task WriteFileRecord(byte addr, UInt16 fileNo, UInt16 recNo, byte[] txFileRecs)
         {
-            if ((txFileRecs.Length == 0) || (txFileRecs.Length > (255 - WRITE_FILE_RECORD_TX_OVERHEAD)))
+            if (addr > 247)
             {
-                throw new ArgumentException();
+                throw new ArgumentOutOfRangeException(nameof(addr));
+            }
+            if (fileNo == 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(fileNo));
+            }
+            if (txFileRecs == null)
+            {
+                throw new ArgumentNullException(nameof(txFileRecs));
+            }
+            if ((txFileRecs.Length == 0)
+                || (txFileRecs.Length > 244)
+                || ((txFileRecs.Length % 2) != 0))
+            {
+                throw new ArgumentOutOfRangeException(nameof(txFileRecs));
+            }
+            if ((recNo > 9999) || ((int)recNo + (txFileRecs.Length / 2) > 10000))
+            {
+                throw new ArgumentOutOfRangeException(nameof(recNo));
             }
 
             byte[] txData = new byte[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length];
-
-            // Form the request
             txData[0] = addr;
             txData[1] = (byte)ModbusCommands.WriteFileRecords;
             txData[2] = (byte)(WRITE_FILE_RECORD_SUBREC_LEN + txFileRecs.Length);
-            txData[3] = (byte)6;  // Reference type is always 6
-            txData[4] = (byte)((fileNo & 0xFF00) >> 8);
-            txData[5] = (byte)(fileNo & 0x00FF);
-            txData[6] = (byte)((recNo & 0xFF00) >> 8);
-            txData[7] = (byte)(recNo & 0x00FF);
-            txData[8] = (byte)(((txFileRecs.Length / 2) & 0xFF00) >> 8);
-            txData[9] = (byte)((txFileRecs.Length / 2) & 0x00FF);  // record length = byte length / 2
+            txData[3] = 6;
+            txData[4] = (byte)(fileNo >> 8);
+            txData[5] = (byte)fileNo;
+            txData[6] = (byte)(recNo >> 8);
+            txData[7] = (byte)recNo;
+            txData[8] = (byte)((txFileRecs.Length / 2) >> 8);
+            txData[9] = (byte)(txFileRecs.Length / 2);
 
             Array.Copy(txFileRecs, 0, txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2, txFileRecs.Length);
 
-            UInt16 crc = Crc16.Calc(txData, WRITE_FILE_RECORD_TX_OVERHEAD - 2 + txFileRecs.Length);
-            txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 2] = (byte)(crc & 0x00FF);
-            txData[WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length - 1] = (byte)((crc & 0xFF00) >> 8);
+            UInt16 crc = Crc16.Calc(txData, txData.Length - 2);
+            txData[txData.Length - 2] = (byte)crc;
+            txData[txData.Length - 1] = (byte)(crc >> 8);
 
-            byte[] rxData = null;
+            byte[] rxData;
             await _semaphore.WaitAsync();
             try
             {
-                // Send the request
-                _log.DebugFormat("Writing {0} records to file number {1} from record number {2} on {3}", txFileRecs.Length / 2, fileNo, recNo, addr);
                 CommsSend(txData);
+                if (addr == 0)
+                {
+                    return;
+                }
 
-                // Get the response
-                rxData = await CommsReceive(WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length);
+                rxData = await CommsReceive(txData.Length);
             }
-            finally { _semaphore.Release(); }
+            finally
+            {
+                _semaphore.Release();
+            }
 
-            // Validate the response
-            if (rxData.Length != (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length))
+            if (rxData.Length != txData.Length)
             {
                 throw new ModbusException(rxData);
             }
 
-            // Verify echo-back (inc. CRC)
-            for (int i = 0; i < (WRITE_FILE_RECORD_TX_OVERHEAD + txFileRecs.Length); i++)
+            for (int i = 0; i < txData.Length; i++)
             {
                 if (txData[i] != rxData[i])
                 {
-                    _log.ErrorFormat("Read-back failed @ {0} - 0x{1:X2} != 0x{2:X2}", i, txData[i], rxData[i]);
                     throw new ModbusException("Read-back verification failed");
                 }
             }
 
             _log.DebugFormat("Wrote {0} bytes", txFileRecs.Length);
+        }
+
+        /// <summary>Validate the full frame length and byte count before any CRC or payload access.</summary>
+        private static void ValidateReadHeader(byte[] rxData, int expectedLength, byte addr,
+                                               ModbusCommands command, int expectedDataCount)
+        {
+            if (null == rxData)
+            {
+                throw new ModbusException("No response data");
+            }
+            if ((rxData.Length != expectedLength)
+                || (rxData[0] != addr)
+                || (rxData[1] != (byte)command)
+                || (rxData[2] != expectedDataCount))
+            {
+                throw new ModbusException(rxData);
+            }
+        }
+
+        /// <summary>Check CRC bytes at positions derived from the validated expected frame size.</summary>
+        private static void ValidateReadCrc(byte[] rxData, int expectedLength)
+        {
+            int crcOffset = expectedLength - 2;
+            UInt16 crc = Crc16.Calc(rxData, crcOffset);
+            if (((byte)crc != rxData[crcOffset]) || ((byte)(crc >> 8) != rxData[crcOffset + 1]))
+            {
+                _log.ErrorFormat("Expected CRC 0x{0:X4} received 0x{1:X2}{2:X2}",
+                                 crc, rxData[crcOffset + 1], rxData[crcOffset]);
+                throw new ModbusException("CRC failure");
+            }
         }
     }
 }
